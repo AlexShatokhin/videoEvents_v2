@@ -14,6 +14,7 @@ import BottomSheet, { BottomSheetView } from '@gorhom/bottom-sheet';
 import Filters from "./components/Filters"
 import { EventInformationType } from "../../types/eventInformationType"
 import EventListWrapper from "../../components/EventListWrapper";
+import { setFilterVisibility } from "./components/FilterComponents/FilterSlice"
 
 const Archive = () => {
     const {
@@ -42,6 +43,9 @@ const Archive = () => {
         if(index === 0){
             bottomSheetRef.current?.snapToIndex(0)
         }
+        if(index === -1){
+            dispatch(setFilterVisibility(false))
+        }
     }, []);
 
     const handleSelectEvent = useCallback((event: EventInformationType) => dispatch(selectEvent(event)), [dispatch])
@@ -67,6 +71,7 @@ const Archive = () => {
 
             <BottomSheet
                 ref={bottomSheetRef}
+                enablePanDownToClose
                 index={-1}
                 snapPoints={["100%"]}
                 onChange={handleSheetChanges}>

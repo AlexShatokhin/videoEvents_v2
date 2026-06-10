@@ -18,10 +18,10 @@ interface EventListWrapperProps {
     onEventSelect: (event: EventInformationType) => void;
     events: EventInformationType[];
     selectedEventItem: EventInformationType | undefined;
-    error: string | null
+    error?: string | null
 }
 
-const EventListWrapper : FC<EventListWrapperProps> = ({children, footer, onEventSelect, events, selectedEventItem, error}) => {
+const EventListWrapper : FC<EventListWrapperProps> = ({children, footer, onEventSelect, events, selectedEventItem, error = null}) => {
     const { theme } = useTypedSelector(state => state.settingsReducer);
     const [disableItemsMode, toggleDisableItemsMode] = useToggle();
     const { width, height } = useWindowDimensions();

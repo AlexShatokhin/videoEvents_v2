@@ -21,7 +21,8 @@ const Archive = () => {
         more,
         searchPosition,
         selectedEvent,
-        events
+        events,
+        error
     } = useTypedSelector(state => state.archiveReducer);
     const {isOpen} = useTypedSelector(state => state.filterReducer)
     const dispatch = useTypedDispatch();
@@ -59,6 +60,7 @@ const Archive = () => {
     return (
         <EventListWrapper 
             footer={renderFooter} 
+            error = {error}
             onEventSelect={handleSelectEvent} 
             events={events} 
             selectedEventItem={selectedEvent}>

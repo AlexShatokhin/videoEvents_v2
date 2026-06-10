@@ -63,7 +63,7 @@ const logic = (ip, user, password) => {
             const res = await parseXmlAsync(convertedRequest);
 
             if (!res || !res['CMSearchResult'] || res['CMSearchResult']['numOfMatches'] == 0) {
-                return { res: resulArr, ok: true, more: false, searchPosition: 0 };
+                return { res: resulArr, ok: true, more: false, searchPosition: 0, error: null };
             }
 
             console.log(res['CMSearchResult']['responseStatusStrg']);
@@ -137,11 +137,12 @@ const logic = (ip, user, password) => {
                 res: resulArr, 
                 ok: true, 
                 more: res['CMSearchResult']['responseStatusStrg'] === 'MORE', 
-                searchPosition: res['CMSearchResult']['responseStatusStrg'] === 'MORE' ? searchPos + maxResults : 0 
+                searchPosition: res['CMSearchResult']['responseStatusStrg'] === 'MORE' ? searchPos + maxResults : 0,
+                error: null
             };
         } catch (e) {
             console.error('Error in getEventsInformation:', e);
-            return { res: resulArr, ok: false, more: false, searchPosition: 0 };        
+            return { res: resulArr, ok: false, more: false, searchPosition: 0,  error: "Ошибка получения событий. \n Проверьте подключение к Wi-Fi и перезагрузите приложение" };        
         }
 
     }
@@ -166,7 +167,7 @@ const logic = (ip, user, password) => {
             const res = await parseXmlAsync(convertedRequest)
 
             if (!res || res['CMSearchResult'] === undefined || res['CMSearchResult']['numOfMatches'] == 0) {
-                return { res: resultArr, ok: true, more: false, searchPosition: 0 };
+                return { res: resultArr, ok: true, more: false, searchPosition: 0, error: null };
             }
 
             let matches = res['CMSearchResult']['matchList']['searchMatchItem'];
@@ -213,11 +214,11 @@ const logic = (ip, user, password) => {
                 }
             }
             const isMore = res['CMSearchResult']['responseStatusStrg'] === 'MORE';
-            return { res: resultArr, ok: true, more: isMore, searchPosition: isMore ? searchPos + maxResults : 0 };
+            return { res: resultArr, ok: true, more: isMore, searchPosition: isMore ? searchPos + maxResults : 0, error: null };
 
         } catch (e) {
             console.error('Error in search:', e);
-            return { res: resultArr, ok: false, more: false, searchPosition: 0 };
+            return { res: resultArr, ok: false, more: false, searchPosition: 0, error: "Ошибка поиска. \n Проверьте подключение к Wi-Fi и перезагрузите приложение" };
         }
     }
 
@@ -298,13 +299,13 @@ const logic = (ip, user, password) => {
                 responseFromXml = result;
                 if (err) {
                     console.error('Error parsing XML:', err);
-                    return { res: resultArr, ok: false, more: false, searchPosition: 0 };
+                    return { res: resultArr, ok: false, more: false, searchPosition: 0,  error: "Ошибка парсинга XML" };
                 }
             });
             const regex = /\/tracks\/(\d{3})/;
             if (responseFromXml != null) {
                 if (responseFromXml['CMSearchResult']['numOfMatches'] == 0)
-                    return { res: resultArr, ok: true, more: false, searchPosition: 0 };
+                    return { res: resultArr, ok: true, more: false, searchPosition: 0, error: null };
 
                 const matches = responseFromXml['CMSearchResult']['matchList']['searchMatchItem'];
                 for (let i = 0; i < matches.length; i++) {
@@ -348,12 +349,12 @@ const logic = (ip, user, password) => {
                 if (responseFromXml['CMSearchResult']['responseStatusStrg'] == 'MORE')
                     if (resultArr.length <= 10) {
                         let newInfo = await searchVideo(dataS, dataPo, searchPos + maxResults, resultArr);
-                        return { res: newInfo.res, ok: newInfo.ok, more: newInfo.more, searchPosition: newInfo.searchPosition }
+                        return { res: newInfo.res, ok: newInfo.ok, more: newInfo.more, searchPosition: newInfo.searchPosition, error: null }
                     }
                     else
-                        return { res: resultArr, ok: true, more: true, searchPosition: searchPos + maxResults }
+                        return { res: resultArr, ok: true, more: true, searchPosition: searchPos + maxResults, error: null }
 
-                return { res: resultArr, ok: true, more: false, searchPosition: 0 };
+                return { res: resultArr, ok: true, more: false, searchPosition: 0, error: null };
             }
         } catch (e) {
             console.error(e);

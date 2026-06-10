@@ -14,6 +14,31 @@ const logic = (ip, user, password) => {
     const searchUrl = `http://${ip}/ISAPI/ContentMgmt/search`;
     const downloadUrl = `http://${ip}/ISAPI/ContentMgmt/download`;
 
+    const parseXmlAsync = (xmlString) => {
+        return new Promise((resolve, reject) => {
+            parseString(xmlString, { explicitArray: false }, (err, result) => {
+                if (err) reject(err);
+                else resolve(result);
+            });
+        });
+    };
+
+
+    const parseCameraTextInfo = (textInfoString) => {
+        if (!textInfoString) return { date: "", time: "", plateNumber: "", gps: "", speed: "0" };
+        
+        const lines = textInfoString.split("\r\n").slice(0, -1);
+        const datetime = (lines[0]?.substring(6) || "").split(" ");
+        
+        return {
+            date: datetime[0] || "",
+            time: datetime[1] || "",
+            plateNumber: lines[1]?.substring(13).trim() || "unknown",
+            gps: lines[2]?.substring(4) || "",
+            speed: lines[3]?.substring(6).trim() || "0"
+        };
+    };
+
     //await search(ip, 'admin', 'Admin12345', dataS, dataPo, 0); // '192.168.20.192:8080'
     // Тип ответа: {res: resultArr, ok: true, more: false, searchPosition: 0}
 
@@ -35,127 +60,89 @@ const logic = (ip, user, password) => {
                 password: password
             })
             const convertedRequest = await request.text();
-            let res = null;
-            parseString(convertedRequest, { explicitArray: false }, async (err, result) => {
-                res = result;
-                if (err) {
-                    console.error('Error parsing XML:', err);
-                    return { res: resulArr, ok: false, more: false, searchPosition: 0 };
-                }
-            });
-            if (res != null) {
-                if (res['CMSearchResult']['numOfMatches'] == 0)
-                    return { res: resulArr, ok: true, more: false, searchPosition: 0 };
-                console.log(res['CMSearchResult']['responseStatusStrg']);
-                console.log(res['CMSearchResult']['numOfMatches']);
-                console.log(res['CMSearchResult']['totalMatches']);
-                let matches = res['CMSearchResult']['matchList']['searchMatchItem'];
-                if (typeof (matches.length) === 'undefined')
-                    matches = [matches];
+            const res = await parseXmlAsync(convertedRequest);
 
-                for (let i = 0; i < matches.length; i++) {
-                    const descriptors = matches[i]['mediaSegmentDescriptor'];
-                    const startTime = matches[i]['timeSpan']['startTime'];
-                    const date = startTime.split('T')[0];
-                    // const trackID = Number(matches[i]['trackID'])+2;
-
-                    const lastDescriptor = descriptors[descriptors.length - 1];
-                    const filename = (lastDescriptor["playbackURI"].split("&")[2].slice(9, -4))
-
-                    const match = lastDescriptor["playbackURI"].match(/tracks\/(\d+)\//);
-                    const trackID = match ? match[1] + "03" : null;
-                    const type = matches[i]['metadataMatches']['metadataDescriptor'].split('/')[1];
-                    const remark = matches[i]['remark'] && typeof matches[i]['remark'] === 'string' ? matches[i]['remark'] : null;
-                    console.log(matches)
-                    if (type === "blacklistAudit") { // eventType === "plateRecognition" || eventType === "blacklistAudit"
-                        const textInfo = lastDescriptor.textInfo.split("\r\n").slice(0, -1);
-                        const datetime = textInfo[0].substring(6).split(" ");
-                        const plateNumber = textInfo[1].substring(13).trim();
-                        const gps = textInfo[2].substring(4);
-                        const speed = textInfo[3].substring(6) || "0";
-                        // await getBlackListText(plateNumber)
-                        resulArr.push({
-                            type,
-                            date: datetime[0],
-                            trackID: trackID,
-                            time: datetime[1],
-                            description: remark || "Нет информации",
-                            plateNumber,
-                            gps,
-                            filename,
-                            speed,
-                            id: uuid.v4()
-                        })
-                    } else {
-                        if (type === "plateRecognition") {
-                            const textInfo = lastDescriptor.textInfo.split("\r\n").slice(0, -1);
-                            const datetime = textInfo[0].substring(6).split(" ");
-                            const plateNumber = textInfo[1].substring(13).trim();
-                            const gps = textInfo[2].substring(4);
-                            const speed = textInfo[3].substring(6).trim() || "0";
-
-                            const match = lastDescriptor["playbackURI"].match(/tracks\/(\d+)\//);
-                            const trackID = match ? match[1] + "03" : null;
-
-                            console.log(filename);
-                            console.log(match)
-                            console.log(lastDescriptor)
-                            if (speed !== "0" || plateNumber !== "unknown")
-                                resulArr.push({
-                                    type,
-                                    date: datetime[0],
-                                    trackID,
-                                    time: datetime[1],
-                                    plateNumber,
-                                    gps,
-                                    filename,
-                                    speed,
-                                    id: uuid.v4(),
-                                })
-                        } else {
-                            if (type === "faceMatch") {
-                                const textInfo = lastDescriptor.textInfo.split("\r\n").slice(0, -1);
-                                const datetime = textInfo[0].substring(6).split(" ");
-                                const name = textInfo[2].substring(5);
-                                const similarity = parseFloat(textInfo[1].substring(11).replace('%', '').trim()) / 100;
-                                console.log(lastDescriptor);
-                                console.log(name, similarity)
-                                resulArr.push({
-                                    type,
-                                    date: datetime[0],
-                                    trackID: trackID,
-                                    time: datetime[1],
-                                    name,
-                                    similarity,
-                                    filename,
-                                    alarmText: remark || "Нет информации",
-                                    id: uuid.v4()
-                                })
-                            }
-                        }
-
-                    }
-
-                }
-
-                if (res['CMSearchResult']['responseStatusStrg'] == 'MORE') {
-                    console.log("done more")
-                    if (resulArr.length <= 10) {
-                        let newInfo = await getEventsInformation(eventType, dataS, dataPo, plate, cameraDirection, searchPos + maxResults, resulArr);
-                        return { res: newInfo.res, ok: newInfo.ok, more: newInfo.more, searchPosition: newInfo.searchPosition }
-                    }
-                    else
-                        return { res: resulArr, ok: true, more: true, searchPosition: searchPos + maxResults }
-                }
-                //return resulArr;
-                //resulArr.push(getEventsInformation(eventType, dataS, dataPo, searchPos+maxResults, resulArr));
+            if (!res || !res['CMSearchResult'] || res['CMSearchResult']['numOfMatches'] == 0) {
+                return { res: resulArr, ok: true, more: false, searchPosition: 0 };
             }
 
+            console.log(res['CMSearchResult']['responseStatusStrg']);
+            console.log(res['CMSearchResult']['numOfMatches']);
+            console.log(res['CMSearchResult']['totalMatches']);
+            let matches = res['CMSearchResult']['matchList']['searchMatchItem'];
+            if (typeof (matches.length) === 'undefined')
+                matches = [matches];
+
+            for (let i = 0; i < matches.length; i++) {
+                const descriptors = matches[i]['mediaSegmentDescriptor'];
+                const lastDescriptor = Array.isArray(descriptors) ? descriptors[descriptors.length - 1] : descriptors;
+
+                if (!lastDescriptor || !lastDescriptor["playbackURI"]) continue;
+
+                const filename = lastDescriptor["playbackURI"].split("&")[2]?.slice(9, -4) || "";
+                const match = lastDescriptor["playbackURI"].match(/tracks\/(\d+)\//);
+                const trackID = match ? match[1] + "03" : null;
+                const type = matches[i]['metadataMatches']['metadataDescriptor'].split('/')[1];
+                const remark = matches[i]['remark'] && typeof matches[i]['remark'] === 'string' ? matches[i]['remark'] : null;
+
+
+                console.log(matches)
+
+                if (type === "blacklistAudit" || type === "plateRecognition") {
+                    const parsedData = parseCameraTextInfo(lastDescriptor.textInfo);
+
+                    if (type === "blacklistAudit") {
+                        resulArr.push({
+                            type,
+                            ...parsedData,
+                            trackID,
+                            description: remark || "Нет информации",
+                            filename,
+                            id: uuid.v4()
+                        });
+                    } else if (parsedData.speed !== "0" || parsedData.plateNumber !== "unknown") {
+                        resulArr.push({
+                            type,
+                            ...parsedData,
+                            trackID,
+                            filename,
+                            id: uuid.v4()
+                        });
+                    }
+                } else if (type === "faceMatch") {
+                    const lines = (lastDescriptor.textInfo || "").split("\r\n").slice(0, -1);
+                    const datetime = (lines[0]?.substring(6) || "").split(" ");
+                    const name = lines[2]?.substring(5) || "";
+                    const similarity = parseFloat(lines[1]?.substring(11).replace('%', '').trim() || "0") / 100;
+
+                    resulArr.push({
+                        type,
+                        date: datetime[0] || "",
+                        trackID,
+                        time: datetime[1] || "",
+                        name,
+                        similarity,
+                        filename,
+                        alarmText: remark || "Нет информации",
+                        id: uuid.v4()
+                    });
+                }
+            }
+
+            if (res['CMSearchResult']['responseStatusStrg'] === 'MORE' && resulArr.length <= 10) {
+                return await getEventsInformation(eventType, dataS, dataPo, plate, cameraDirection, searchPos + maxResults, resulArr, eventsCount);
+            }
+
+            return { 
+                res: resulArr, 
+                ok: true, 
+                more: res['CMSearchResult']['responseStatusStrg'] === 'MORE', 
+                searchPosition: res['CMSearchResult']['responseStatusStrg'] === 'MORE' ? searchPos + maxResults : 0 
+            };
         } catch (e) {
-            console.error(e);
+            console.error('Error in getEventsInformation:', e);
+            return { res: resulArr, ok: false, more: false, searchPosition: 0 };        
         }
-        console.log("done no more")
-        return { res: resulArr, ok: true, more: false, searchPosition: 0 };
 
     }
 
@@ -176,66 +163,62 @@ const logic = (ip, user, password) => {
                 password: password
             })
             const convertedRequest = await request.text();
-            let res = null;
-            parseString(convertedRequest, { explicitArray: false }, async (err, result) => {
-                res = result;
-                if (err) {
-                    console.error('Error parsing XML:', err);
-                    return { res: resultArr, ok: false, more: false, searchPosition: 0 };
-                }
-            });
-            // console.log("Images result " + JSON.stringify(res));
-            if (res != null) {
-                console.log(res);
-                let matches = [];
-                if (res['CMSearchResult'] == undefined)
-                    matches = res;
-                if (res['CMSearchResult']['numOfMatches'] == 0)
-                    return { res: resultArr, ok: true, more: false, searchPosition: 0 };
+            const res = await parseXmlAsync(convertedRequest)
 
-                console.log(res['CMSearchResult']['responseStatusStrg']);
-                console.log(res['CMSearchResult']['numOfMatches']);
-                console.log(res['CMSearchResult']['totalMatches']);
-                matches = res['CMSearchResult']['matchList']['searchMatchItem'];
-                if (typeof (matches.length) === 'undefined')
-                    matches = [matches];
-                for (let i = 0; i < matches.length; i++) {
-                    const descriptors = matches[i]['mediaSegmentDescriptor'];
-                    const textInfo = descriptors[descriptors.length - 1].textInfo.split("\r\n").slice(0, -1);
-                    console.log(textInfo)
-                    const plateNumber = textInfo[1].substring(13).trim();
-
-                    console.log(plateNumberFind, plateNumber)
-                    if (plateNumberFind !== "" && plateNumber !== plateNumberFind)
-                        continue;
-
-                    const startTime = matches[i]['timeSpan']['startTime'];
-                    const date = startTime.split('T')[0];
-                    const trackID = Number(matches[i]['trackID']) + 2;
-                    const type = matches[i]['metadataMatches']['metadataDescriptor'].split('/')[1];
-                    if (typeof (descriptors.length) === 'undefined')
-                        descriptors = [descriptors];
-                    for (let k = 0; k < descriptors.length; k++)
-                        if (descriptors[k]['contentType'] == 'picture') {
-                            const playbackURI = descriptors[k]['playbackURI'];
-                            const name = new URLSearchParams(playbackURI.split('?')[1]).get('name');
-                            const size = new URLSearchParams(playbackURI.split('?')[1]).get('size');
-                            const downloadUri = `rtsp://${ip}/picture/Streaming/tracks/${trackID}?starttime=${startTime}&endtime=1970-01-01 00:00:00Z&name=${name}&size=${size}`;
-                            const file = await getFile(downloadUri);
-
-                            resultArr.push(file);
-                        }
-                }
-                if (res['CMSearchResult']['responseStatusStrg'] == 'MORE') {
-                    //resultArr.push(search(eventType, dataS, dataPo, searchPos+maxResults, resultArr));
-                    return { res: resultArr, ok: true, more: true, searchPosition: searchPos + maxResults };
-                }
+            if (!res || res['CMSearchResult'] === undefined || res['CMSearchResult']['numOfMatches'] == 0) {
+                return { res: resultArr, ok: true, more: false, searchPosition: 0 };
             }
 
+            let matches = res['CMSearchResult']['matchList']['searchMatchItem'];
+            if (typeof (matches.length) === 'undefined')
+                matches = [matches];
+
+  
+            console.log(res);
+
+
+            console.log(res['CMSearchResult']['responseStatusStrg']);
+            console.log(res['CMSearchResult']['numOfMatches']);
+            console.log(res['CMSearchResult']['totalMatches']);
+
+            for (let i = 0; i < matches.length; i++) {
+                let descriptors = matches[i]['mediaSegmentDescriptor'];
+                if (!Array.isArray(descriptors)) {
+                    descriptors = [descriptors];
+                }
+
+                const lastDescriptor = descriptors[descriptors.length - 1];
+                const parsedData = parseCameraTextInfo(lastDescriptor?.textInfo);
+
+                if (plateNumberFind !== "" && parsedData.plateNumber !== plateNumberFind) {
+                    continue;
+                }
+                const startTime = matches[i]['timeSpan']['startTime'];
+                const trackID = Number(matches[i]['trackID']) + 2;  
+                    
+                for (let k = 0; k < descriptors.length; k++) {
+                    if (descriptors[k]['contentType'] === 'picture') {
+                        const playbackURI = descriptors[k]['playbackURI'];
+
+                        const nameMatch = playbackURI.match(/[?&]name=([^&]+)/);
+                        const sizeMatch = playbackURI.match(/[?&]size=([^&]+)/);
+                        
+                        const name = nameMatch ? nameMatch[1] : "";
+                        const size = sizeMatch ? sizeMatch[1] : "";
+                        
+                        const downloadUri = `rtsp://${ip}/picture/Streaming/tracks/${trackID}?starttime=${startTime}&endtime=1970-01-01 00:00:00Z&name=${name}&size=${size}`;
+                        const file = await getFile(downloadUri);
+                        resultArr.push(file);
+                    }
+                }
+            }
+            const isMore = res['CMSearchResult']['responseStatusStrg'] === 'MORE';
+            return { res: resultArr, ok: true, more: isMore, searchPosition: isMore ? searchPos + maxResults : 0 };
+
         } catch (e) {
-            console.error(e);
+            console.error('Error in search:', e);
+            return { res: resultArr, ok: false, more: false, searchPosition: 0 };
         }
-        return { res: resultArr, ok: true, more: false, searchPosition: 0 };
     }
 
     async function getFile(downloadUri, iteration = 0) {
@@ -258,7 +241,7 @@ const logic = (ip, user, password) => {
         } catch (error) {
             console.error('Error:', error);
             if (iteration < 1) {
-                return await getFile(downloadUrl, downloadUri, iteration + 1);
+                return await getFile(downloadUri, iteration + 1);
             } else {
                 return `Error!downloadURL=${downloadUrl},downloadURI=${downloadUri}`;
             }

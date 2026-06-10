@@ -1,0 +1,1 @@
+export type ProcessType = "loading" | "error" | "waiting" | "confirmed"

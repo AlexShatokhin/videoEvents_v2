@@ -2,6 +2,7 @@ import { createSlice } from "@reduxjs/toolkit";
 import { getCurrentDate } from "../../../helpers/getCurrentDate";
 import { getCurrentTime } from "../../../helpers/getCurrentTime";
 import { cameraDirection } from "../../../types/cameraDirectionEnum";
+import { eventsEnum } from "../../../types/eventsEnum";
 import {getZero}  from "../../../helpers/getZero"
 
 const initialState: {
@@ -58,6 +59,12 @@ const videoSlice = createSlice({
                     state.timeTo = `${getZero(timeTo.getHours()) }:${getZero(timeTo.getMinutes())}`;
                     break;
             }
+        },
+        changeVideoFilterValue: (state, action) => {
+            const { key, value } = action.payload;
+            if (key in state) {
+                (state as any)[key] = value;
+            }
         }
     },
 })
@@ -70,5 +77,6 @@ export const {
     setVideos, 
     setCurrentFilterValues, 
     setDate, 
-    setTime
+    setTime,
+    changeVideoFilterValue
 } = actions;

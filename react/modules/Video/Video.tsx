@@ -1,12 +1,13 @@
 import { findNodeHandle, NativeModules, requireNativeComponent, StyleSheet, Text, View, UIManager } from 'react-native'
-import React, { useCallback, useEffect, useRef, useState } from 'react'
+import React, { useCallback, useEffect, useRef, useState, useMemo, ScrollView } from 'react'
 import Slider from '@react-native-community/slider';
 import { colors } from '../../../constants/colors';
 import { PlayerActionButton } from './components/PlayerActionButton';
 import { format, fromUnixTime } from 'date-fns';
 import { useTypedSelector } from '../../hooks/useRedux';
 import BottomSheet, { BottomSheetView } from '@gorhom/bottom-sheet';
-import { VideoFilter } from './components/VideoFilter';
+import VideoFilter from './components/VideoFilter';
+import { RecordedRangeCard } from './components/RecordedRangeCard';
 
 const HikVideoView = requireNativeComponent("HikVideoView");
 const { HikAuth, HikGetFile } = NativeModules;
@@ -21,17 +22,30 @@ enum Commands  {
 }
 
 
-const START_TIME = new Date("2026-04-07 08:50:00").getTime() / 1000; // 2026-04-07 08:50:00
-const END_TIME = new Date("2026-04-07 09:00:00").getTime() / 1000;   // 2026-04-07 09:00:00
+export interface RecordRange { // Вынес интерфейс, чтобы использовать в RecordedRangeCard
+    start: string;
+    end: string;
+}
+
+// --- ТЕСТОВЫЕ ДАННЫЕ ДЛЯ RecordedRangeCard ---
+const TEST_RECORDED_RANGES: RecordRange[] = [
+    { start: "2026-04-07 08:05:00", end: "2026-04-07 08:15:00" },
+    { start: "2026-04-07 08:30:00", end: "2026-04-07 08:45:00" },
+    { start: "2026-04-07 09:00:00", end: "2026-04-07 09:10:00" },
+    { start: "2026-04-07 09:25:00", end: "2026-04-07 09:35:00" },
+    { start: "2026-04-07 09:40:00", end: "2026-04-07 09:55:00" },
+];
+// --- КОНЕЦ ТЕСТОВЫХ ДАННЫХ ---
 
 export default function Video() {
-	const {isFilterOpen, date, timeFrom, timeTo} = useTypedSelector(state => state.videoReducer)
+	const {isFilterOpen, date, timeFrom, timeTo, videos} = useTypedSelector(state => state.videoReducer)
 	const [logId, setLogId] = useState<number>(0);
 	const [activePlayerStatus, setActivePlayerStatus] = useState<Commands>(Commands.STOP);
-	const [currentPosition, setCurrentPosition] = useState<number>(START_TIME);
+	const [currentPosition, setCurrentPosition] = useState<number>(0); // Начальное значение 0
 	const [isSliding, setIsSliding] = useState<boolean>(false);
-	const [startTime, setStartTime] = useState<number>(START_TIME);
-	const [endTime, setEndTime] = useState<number>(END_TIME);
+	const [startTime, setStartTime] = useState<number>(0); // Начальное значение 0
+	const [endTime, setEndTime] = useState<number>(0);     // Начальное значение 0
+	const [showRangeCards, setShowRangeCards] = useState<boolean>(false); // Для отображения/скрытия карточек
 	const videoPlayerRef = useRef(null)
 	const bottomSheetRef = useRef<BottomSheet>(null);
 
@@ -43,14 +57,20 @@ export default function Video() {
 	}, [isFilterOpen])
 
 	const getNewVideo = () => {
-		const startTime = `${date} ${timeFrom}:00`;
-		const endTime = `${date} ${timeTo}:00`;
+		// Используем 'T' для кроссплатформенного парсинга даты в JS
+		const startTimeStr = `${date}T${timeFrom}:00`;
+		const endTimeStr = `${date}T${timeTo}:00`;
 
-		setStartTime(new Date(startTime).getTime() / 1000);
-		setEndTime(new Date(endTime).getTime() / 1000);
-		setCurrentPosition(new Date(startTime).getTime() / 1000);
+		const startTs = new Date(startTimeStr).getTime() / 1000;
+		const endTs = new Date(endTimeStr).getTime() / 1000;
 
-		sendCommand('getVideo', [startTime, endTime]);
+		setStartTime(startTs);
+		setEndTime(endTs);
+		setCurrentPosition(startTs);
+
+		setShowRangeCards(true); // Показываем карточки после применения фильтра
+		// Нативной части отправляем формат с пробелом, как она ожидает
+		sendCommand('getVideo', [startTimeStr.replace('T', ' '), endTimeStr.replace('T', ' ')]);
 		setActivePlayerStatus(Commands.START);
 	}
 
@@ -133,15 +153,42 @@ export default function Video() {
 	}
 
 	const formatDisplayTime = (seconds : number) => {
-		return format(fromUnixTime(seconds), 'yyyy-MM-dd H:mm:ss');
+		// Используем HH для ведущего нуля, чтобы Native SDK корректно парсил время
+		return format(fromUnixTime(seconds), 'yyyy-MM-dd HH:mm:ss');
 	};
 
+	// Обновленная функция для перемотки, теперь принимает endTime
 	const onVideoProgress = (event : any) => {
 		const currentProgress = event.nativeEvent.currentProgress;
-		
-		console.log("Текущий прогресс:", currentProgress);
 		setCurrentPosition(currentProgress);
 	};
+
+	const handleTimelineSeek = (time: number, newEndTime?: number) => {
+		setCurrentPosition(time);
+		sendCommand('seekTo', [formatDisplayTime(time), formatDisplayTime(newEndTime || endTime)]);
+	};
+
+	const handleRangeCardPress = (range: RecordRange) => {
+		const rangeStartTs = new Date(range.start.replace(' ', 'T')).getTime() / 1000;
+		const rangeEndTs = new Date(range.end.replace(' ', 'T')).getTime() / 1000;
+
+		setStartTime(rangeStartTs);
+		setEndTime(rangeEndTs);
+		setCurrentPosition(rangeStartTs);
+		setShowRangeCards(false); // Скрываем карточки после выбора
+
+		// Отправляем команду на перемотку в плеер
+		sendCommand('seekTo', [formatDisplayTime(rangeStartTs), formatDisplayTime(rangeEndTs)]);
+	};
+
+	// Используем actualVideos, если они есть, иначе TEST_RECORDED_RANGES для демонстрации
+	const displayedRanges = useMemo(() => {
+		// Убедимся, что videos содержит объекты с полями 'start' и 'end'
+		if (videos && videos.length > 0 && videos[0].start && videos[0].end) {
+			return videos as RecordRange[];
+		}
+		return TEST_RECORDED_RANGES; // Если реальных данных нет, используем тестовые
+	}, [videos]);
 
 	const handleSheetChanges = useCallback((index: number) => {
 		if(index === 0){
@@ -156,33 +203,41 @@ export default function Video() {
 				style={{width: '100%', height: 370}} 
 				fileName = "ch01_00000200372000100" 
 				logId = {logId}
-				onProgress = {() => {}} />
-			<View>
-				<View style={styles.playerContainer}>
-					<View style={{width: "68%"}}>
-						<Slider 
-							style={{zIndex: 10}}
-							step={1}
-							minimumValue={startTime}
-							maximumValue={endTime}
-							value={currentPosition}
-							onSlidingStart={() => setIsSliding(true)}
-							onValueChange={(value) => setCurrentPosition(value)}
-							onSlidingComplete={(value) => {
-								setIsSliding(false);
-								sendCommand('seekTo', [formatDisplayTime(value)]);
-							}}
-							minimumTrackTintColor={colors.lightblue}
-							maximumTrackTintColor={colors.deepblue}
-							thumbTintColor={colors.lightblue}
-
-						/>
+				onProgress = {onVideoProgress} />
+			<View style={{paddingHorizontal: 10}}>
+				<View style={[styles.playerContainer, {width: "100%", marginTop: 10}]}>
+					<Slider 
+						style={{flex: 1}} // Slider занимает всю доступную ширину
+						step={1}
+						minimumValue={startTime}
+						maximumValue={endTime}
+						currentPosition={currentPosition}
+						value={currentPosition}
+						onSlidingStart={() => setIsSliding(true)}
+						onValueChange={(value) => setCurrentPosition(value)}
+						onSlidingComplete={(value) => {
+							setIsSliding(false);
+							handleTimelineSeek(value); // Передаем только время начала, endTime остается текущим
+						}}
+						minimumTrackTintColor={colors.lightblue}
+						maximumTrackTintColor={colors.deepblue}
+						thumbTintColor={colors.lightblue}
+					/>
+				</View>
+				{showRangeCards && displayedRanges.length > 0 && (
+					<View style={styles.rangeCardsContainer}>
+						<Text style={styles.rangeCardsTitle}>Доступные записи:</Text>
+						<View >
+							{displayedRanges.map((range, index) => (
+								<RecordedRangeCard key={index} range={range} onPress={handleRangeCardPress} />
+							))}
+						</View>
 					</View>
-					<View style={[styles.playerTimeContainer, {width: "30%"}]}>
-						<Text style={styles.playerTimeText}>{formatTime(currentPosition)}</Text>
-						<Text style={styles.playerTimeText}> / </Text>
-						<Text style={styles.playerTimeText}>{formatTime(endTime)}</Text>
-					</View>
+				)}
+				<View style={[styles.playerTimeContainer, {marginTop: 5}]}>
+					<Text style={styles.playerTimeText}>{formatTime(currentPosition)}</Text>
+					<Text style={styles.playerTimeText}> / </Text>
+					<Text style={styles.playerTimeText}>{formatTime(endTime)}</Text>
 				</View>
 				<View style={[styles.playerContainer, {marginTop: 15}]}>
 					<View style={{width: "33%", display: "flex", justifyContent: "flex-start", alignItems: "center"}} />
@@ -236,6 +291,21 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         zIndex: 1000,
         elevation: 100
-    }
+    },
+    rangeCardsContainer: {
+        marginTop: 15,
+        marginBottom: 5,
+        paddingVertical: 10,
+        backgroundColor: 'rgba(255, 255, 255, 0.05)', // Легкое выделение фона
+        borderRadius: 12,
+    },
+    rangeCardsTitle: {
+        color: colors.white,
+        fontSize: 14,
+        fontWeight: '600',
+        marginLeft: 10,
+        marginBottom: 8,
+        opacity: 0.8,
+    },
 	
 })

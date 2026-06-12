@@ -5,8 +5,6 @@ import { StyleSheet } from "react-native";
 import { colors } from "../../../../../constants/colors";
 import { cameraDirection } from "../../../../types/cameraDirectionEnum";
 import { DirectionIconType } from "../../../../types/DirectionIconType";
-import { useTypedDispatch, useTypedSelector } from "../../../../hooks/useRedux";
-import { changeFilterValue } from "./FilterSlice";
 import PressableArea from "../../../../UI/PressableArea";
 import { eventsEnum } from "../../../../types/eventsEnum";
 
@@ -18,19 +16,19 @@ type CameraDirectionEvent = {
 
 type EventPickerPropsType = {
     events: Array<CameraDirectionEvent>,
-    selected: string[],
+    selected: cameraDirection[],
+    onSelect: (direction: cameraDirection) => void,
+    isOptionDisabled?: (direction: cameraDirection) => boolean,
+    isFilterCamerasDisabled?: boolean | null
 }
 
-const CameraDirectionPicker : FC<EventPickerPropsType> = ({events}) => {
-    const dispatch = useTypedDispatch();
-    const {cameraDirection: selectedEvents, eventType} = useTypedSelector(state => state.filterReducer);
-    const {isDisableFilterCameras} = useTypedSelector(state => state.settingsReducer)
-
-    const handleItemPress = useCallback((value: cameraDirection) => {
-        const selected = selectedEvents.indexOf(value) !== -1 ? selectedEvents.filter(direction => direction !== value) : [...selectedEvents, value];
-        dispatch(changeFilterValue({key: "cameraDirection", value: selected}))
-
-    }, [selectedEvents, dispatch]);
+const CameraDirectionPicker : FC<EventPickerPropsType> = ({
+    events, 
+    selected, 
+    onSelect, 
+    isOptionDisabled, 
+    isFilterCamerasDisabled = false
+}) => {
     const selectedItemStyle = useMemo(() => [styles.cameraItem, styles.checked], []);
     const unselectedItemStyle = useMemo(() => [styles.cameraItem], []);
     const sortDirections = useMemo(() => {
@@ -52,37 +50,24 @@ const CameraDirectionPicker : FC<EventPickerPropsType> = ({events}) => {
         return directions;
     }, [events]);
 
-    const isCameraDisabled = useCallback((direction: cameraDirection) => {
-        switch(eventType){
-            case eventsEnum.blacklistAudit:
-            case eventsEnum.plateRecognition: 
-                return direction === cameraDirection.BackLeft || direction === cameraDirection.TopLeft || direction === cameraDirection.BackRight || direction === cameraDirection.TopRight;
-
-            case eventsEnum.faceMatch:
-                return direction === cameraDirection.Back || direction === cameraDirection.Top;
-            default: return false;
-        }
-    }, [eventType])
-
     const renderCameraDirections = useCallback(() => sortDirections.map((event) => {
         if(event.direction === -1){
             throw new Error("Camera direction is missing!");
         }
 
-        const isSelected = selectedEvents.indexOf(event.direction) !== -1;
+        const isSelected = selected.includes(event.direction);
+        const isDisabled = isFilterCamerasDisabled ? isOptionDisabled?.(event.direction as cameraDirection) : false;
 
-        const isOptionEnable = isDisableFilterCameras === null ? true : isDisableFilterCameras;
-        const isDisabled = isOptionEnable ? isCameraDisabled(event.direction) : false;
         return (
             <PressableArea
-                disabled={isCameraDisabled(event.direction as cameraDirection)}
+                disabled={isDisabled}
                 key={event.value}
                 style={[isSelected ? selectedItemStyle : unselectedItemStyle, isDisabled && {opacity: 0.3, backgroundColor: colors.lightgrey}]}
-                onPress={() => handleItemPress(event.direction as cameraDirection)}>
+                onPress={() => onSelect(event.direction as cameraDirection)}>
                 <event.label color={isDisabled ? colors.lightgrey: isSelected ? colors.white : colors.lightblue}/>
             </PressableArea>
         )
-    }), [handleItemPress, events, selectedEvents]) 
+    }), [onSelect, events, selected, isOptionDisabled, isFilterCamerasDisabled]) 
 
     return (
         <Stack direction="row" style={styles.camerasContainer}>

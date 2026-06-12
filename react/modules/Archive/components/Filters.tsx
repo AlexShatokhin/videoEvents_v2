@@ -15,6 +15,7 @@ import FilterField from "../../../components/Filter/FilterElements/FilterField"
 import CameraDirectionPicker from "./FilterComponents/CameraDirectionPicker"
 import { convertCameraIdToCameraDirectionIcon, convertCameraIdToCameraDirectionString } from "../../../helpers/convertCameraDirectionToCameraID"
 import { ApplyButton } from "../../../components/Filter/FilterElements/ApplyButton"
+import { cameraDirection as cameraDirectionEnum } from "../../../types/cameraDirectionEnum"
 
 const Filters = () => {
     const {
@@ -27,6 +28,7 @@ const Filters = () => {
         cameraDirection
     } = useTypedSelector(state => state.filterReducer);
     const cameras = useTypedSelector(state => state.settingsReducer.cameras);
+    const { isDisableFilterCameras } = useTypedSelector(state => state.settingsReducer);
     const dispatch = useTypedDispatch();
     const eventTypes = useMemo(() => getEventTypesAsObject(), []);
     const [isShowNumberPlate, setIsShowNumberPlate] = useState(false)
@@ -61,6 +63,28 @@ const Filters = () => {
     }, [eventType])
 
     const isHasAllValues = () => !!(dateFrom && dateTo && timeFrom && timeTo && eventType && cameraDirection)
+
+    const handleCameraSelect = useCallback((direction: cameraDirectionEnum) => {
+        const isSelected = cameraDirection.includes(direction);
+        const newValue = isSelected 
+            ? cameraDirection.filter((d: cameraDirectionEnum) => d !== direction)
+            : [...cameraDirection, direction];
+        
+        dispatch(changeFilterValue({ key: "cameraDirection", value: newValue }));
+    }, [cameraDirection, dispatch]);
+
+    const isCameraDisabled = useCallback((direction: cameraDirectionEnum) => {
+        switch(eventType){
+            case eventsEnum.blacklistAudit:
+            case eventsEnum.plateRecognition: 
+                return [cameraDirectionEnum.BackLeft, cameraDirectionEnum.TopLeft, cameraDirectionEnum.BackRight, cameraDirectionEnum.TopRight].includes(direction);
+
+            case eventsEnum.faceMatch:
+                return [cameraDirectionEnum.Back, cameraDirectionEnum.Top].includes(direction);
+                
+            default: return false;
+        }
+    }, [eventType]);
 
     const getEventTypeItems = () =>
         eventTypes.filter(item => item.value !== eventsEnum.facedetection)
@@ -112,7 +136,11 @@ const Filters = () => {
                     <FilterField title="Камера">
                         <CameraDirectionPicker 
                             selected={cameraDirection}
-                            events={getCamerasWithIcon()}/>
+                            events={getCamerasWithIcon()}
+                            onSelect={handleCameraSelect}
+                            isFilterCamerasDisabled={isDisableFilterCameras}
+                            isOptionDisabled={isCameraDisabled}
+                        />
                     </FilterField>     
                 </Stack>                
 

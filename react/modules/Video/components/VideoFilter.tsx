@@ -1,24 +1,27 @@
-import React, { useEffect } from "react"
+import React, { memo, useEffect } from "react"
 import { Stack } from "@react-native-material/core"
 import { colors } from "../../../../constants/colors"
-import { StyleSheet, View } from "react-native"
+import { StyleSheet } from "react-native"
 import { ApplyButton } from "../../../components/Filter/FilterElements/ApplyButton"
 import FilterField from "../../../components/Filter/FilterElements/FilterField"
-import DateTimePicker from "../../../modules/Archive/components/FilterComponents/DateTimePicker"
 import { CustomCalendar } from "../../../components/Calendar/CustomCalendar";
 import useToggle  from "../../../hooks/useToggle";
 import CustomButton from "../../../UI/CustomButton"
 import FilterTimePicker from "../../../modules/Archive/components/FilterComponents/FilterTimePicker"
 import { useTypedDispatch, useTypedSelector } from "../../../hooks/useRedux"
-import {setCurrentFilterValues, setDate, setTime} from "../slice/videoSlice"
+import {setCurrentFilterValues, setDate, setTime, changeVideoFilterValue} from "../slice/videoSlice"
 import { getCalendarDate } from "../../../modules/Archive/helpers/getCalendarDate"
+import CameraDirectionPicker from "../../Archive/components/FilterComponents/CameraDirectionPicker"
+import { convertCameraIdToCameraDirectionIcon, convertCameraIdToCameraDirectionString } from "../../../helpers/convertCameraDirectionToCameraID"
 
-export const VideoFilter = ({apply} : {apply: () => void}) => {
+const VideoFilter = ({apply} : {apply: () => void}) => {
     const [calendarVisible, toggleCalendarVisibility] = useToggle()
     const [timeFromVisible, toggleTimeFromVisibility] = useToggle()
     const [timeToVisible, toggleTimeToVisibility] = useToggle()
 
-    const { date, timeFrom, timeTo } = useTypedSelector(state => state.videoReducer)
+    const { date, timeFrom, timeTo, cameraDirection } = useTypedSelector(state => state.videoReducer)
+    const cameras = useTypedSelector(state => state.settingsReducer.cameras);
+    const { isDisableFilterCameras } = useTypedSelector(state => state.settingsReducer);
     const dispatch = useTypedDispatch();
 
     useEffect(() => {
@@ -37,50 +40,73 @@ export const VideoFilter = ({apply} : {apply: () => void}) => {
         dispatch(setTime({ key: type, value: selectedTime }))
     }
 
+    const getCamerasWithIcon = () => {
+        return cameras.map(camera => ({
+            ...camera,
+            label: convertCameraIdToCameraDirectionIcon(+camera.value, cameras), 
+            direction: convertCameraIdToCameraDirectionString(+camera.value, cameras)
+        }))
+    }
+
+    const isHasAllValues = () => !!(date && timeFrom && timeTo && cameraDirection)
+
     return (
         <Stack direction="column">
             <Stack direction="row" style={styles.buttonsRow}>
                 <ApplyButton
                     onPress={apply}
-                    disabled={false}
+                    disabled={!isHasAllValues()}
                 />
             </Stack>
             <Stack direction="row" style={styles.fieldsWrapper}>
-                <View style={styles.filterField}>
+                <Stack direction="column" style={styles.eventColumn}>
                     <FilterField title="Дата и время">
-                        <CustomButton label={date} onPress={toggleCalendarVisibility} />
-                        <CustomButton label={timeFrom} onPress={toggleTimeFromVisibility} />
-                        <CustomButton label={timeTo} onPress={toggleTimeToVisibility} />
+                        <Stack direction="row" spacing={10}>
+                            <CustomButton 
+                                buttonStyle={styles.dateButtonFrom} 
+                                label={date} 
+                                onPress={toggleCalendarVisibility} />
+                            <CustomButton 
+                                buttonStyle={styles.timeButtonFrom} 
+                                textStyle={styles.timeButtonText} 
+                                label={timeFrom} 
+                                onPress={toggleTimeFromVisibility} />
+                            <CustomButton 
+                                buttonStyle={styles.timeButtonTo} 
+                                textStyle={styles.timeButtonText} 
+                                label={timeTo} 
+                                onPress={toggleTimeToVisibility} />
+                        </Stack>
                         <CustomCalendar
                             label="Выбрать дату"
-                            onChoose = {handleDate}
+                            onChoose={handleDate}
                             dateFrom={date}
                             dateTo={date}
                             visible={calendarVisible}
                             changeVisibility={toggleCalendarVisibility}
                         />
-                        {timeFromVisible && 
-                            <FilterTimePicker
-                                handlePickTime={(event) => handleTime(event, "timeFrom")}
-                                changeVisibility={toggleTimeFromVisibility}/>
-                        }
-        
-                        {timeToVisible && 
-                            <FilterTimePicker 
-                                handlePickTime={(event) => handleTime(event, "timeTo")}
-                                changeVisibility={toggleTimeToVisibility}/>
-                        }   
+                        {timeFromVisible && <FilterTimePicker handlePickTime={(e) => handleTime(e, "timeFrom")} changeVisibility={toggleTimeFromVisibility}/>}
+                        {timeToVisible && <FilterTimePicker handlePickTime={(e) => handleTime(e, "timeTo")} changeVisibility={toggleTimeToVisibility}/>}   
                     </FilterField>
-                </View>
-                <View style={styles.filterField}>
+                </Stack>
+
+                <Stack direction="column" style={styles.dateColumn}>
                     <FilterField title="Камера">
-                        <DateTimePicker />
+                        <CameraDirectionPicker 
+                            selected={[cameraDirection]}
+                            events={getCamerasWithIcon()}
+                            onSelect={(value) => dispatch(changeVideoFilterValue({key: "cameraDirection", value}))}
+                            isFilterCamerasDisabled={isDisableFilterCameras}
+                            isOptionDisabled={() => false}
+                        />
                     </FilterField>
-                </View>
+                </Stack>
             </Stack>
         </Stack>
     )
 }
+
+export default memo(VideoFilter);
 
 const styles = StyleSheet.create({
     main: {
@@ -133,5 +159,33 @@ const styles = StyleSheet.create({
         marginLeft: 25,
         borderRadius: 7,
         opacity: 1
-    }
+    },
+
+    dateTimeLabel: {
+        fontSize: 20,
+        fontWeight: "600"
+    },
+    dateButtonFrom: {
+        backgroundColor: colors.lightblue,
+        borderColor: colors.lightblue,
+        marginLeft: 10
+    },
+    dateButtonTo: {
+        backgroundColor: colors.lightblue,
+        borderColor: colors.lightblue,
+        marginLeft: 10
+    },
+    timeButtonFrom: {
+        backgroundColor: 'transparent',
+        borderColor: colors.lightblue,
+        marginLeft: 10
+    },
+    timeButtonTo: {
+        backgroundColor: 'transparent',
+        borderColor: colors.lightblue,
+        marginLeft: 10
+    },
+    timeButtonText: {
+        color: colors.lightblue
+    },    
 })

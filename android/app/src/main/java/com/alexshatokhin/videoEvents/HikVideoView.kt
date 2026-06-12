@@ -207,19 +207,10 @@ class HikVideoView(context: Context) : SurfaceView(context), SurfaceHolder.Callb
         }
 
     }
-    fun seekTo(time : String){
-        Log.i("HikDebug", "Перемотка на " + time)
-        //progress = time
-
-        //val lpInBuf = ByteArray(60);
-        //lpInBuf[0] = time.toByte();
+    fun seekTo(time : String, stopTime: String){
+        Log.i("HikDebug", "Перемотка на $time до $stopTime")
         stopPlay()
-        startPlaybackByTime(time, "2026-04-07 9:30:00")
-//        val seekResult = SDKGuider.g_sdkGuider.m_comPBGuider.PlayBackControl_V40_jni(playbackId, 12, lpInBuf, 4, null)
-//        if(seekResult)
-//            Log.i("HikDebug","Перемотка выполнена")
-//        else
-//            Log.e("HikDebug", "Ошибка перемотки " + SDKGuider.g_sdkGuider.GetLastError_jni())
+        startPlaybackByTime(time, stopTime)
     }
     fun download(){
         Log.i("HikDebug", "Скачивание")

@@ -62,11 +62,12 @@ class HikVideoManager : SimpleViewManager<HikVideoView>() {
             }
             "seekTo" -> {
                 val time = args?.getString(0)
-                if (time != null) {
-                    view.seekTo(time)
+                val stopTime = args?.getString(1) // Получаем второй аргумент
+                if (time != null && stopTime != null) {
+                    view.seekTo(time, stopTime)
                 } else {
-
-                    view.seekTo("2026-04-07 08:50:00")
+                    // Если аргументы отсутствуют, можно логировать ошибку или использовать значения по умолчанию
+                    Log.e("HikDebug", "Ошибка: seekTo вызван без необходимых аргументов времени.")
                 }
             }
             else -> super.receiveCommand(view, commandId, args)

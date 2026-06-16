@@ -11,7 +11,12 @@ const initialState: {
     timeTo: string,
     loading: boolean,
     error: string | null,
-    videos: any[],
+    videos: {
+        startTime: string,
+        endTime: string,
+        name: string,
+        size: number
+    }[],
     cameraDirection: cameraDirection,
     isFilterOpen: boolean,
 } = {

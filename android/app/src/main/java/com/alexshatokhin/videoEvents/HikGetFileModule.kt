@@ -11,7 +11,7 @@ class HikGetFileModule(reactContext: ReactApplicationContext) : ReactContextBase
     override fun getName(): String = "HikGetFile"
 
     @ReactMethod
-    fun getFiles(channel: Int, promise: Promise) {
+    fun getFiles(channel: Int, startTime: String, endTime: String, promise: Promise) {
         val fileList = Arguments.createArray()
 
         val userID = SDKGuider.g_sdkGuider.m_iLogID
@@ -24,10 +24,16 @@ class HikGetFileModule(reactContext: ReactApplicationContext) : ReactContextBase
         val timeStart = NET_DVR_TIME()
         val timeStop = NET_DVR_TIME()
 
-        // Правильная работа с датами (за последние 24 часа)
+
+        val sdf = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.CHINA)
+
+        val startDoc = sdf.parse(startTime)
+        val endDoc = sdf.parse(endTime)
+
         val calStart = Calendar.getInstance()
         val calEnd = Calendar.getInstance()
-        calStart.add(Calendar.DAY_OF_MONTH, -1) // Минус 1 день
+        if (startDoc != null) calStart.time = startDoc
+        if (endDoc != null) calEnd.time = endDoc
 
         SDKGuider.g_sdkGuider.m_comPBGuider.ConvertToTime(timeStart, calStart)
         SDKGuider.g_sdkGuider.m_comPBGuider.ConvertToTime(timeStop, calEnd)

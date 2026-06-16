@@ -4,10 +4,11 @@ import Slider from '@react-native-community/slider';
 import { colors } from '../../../constants/colors';
 import { PlayerActionButton } from './components/PlayerActionButton';
 import { format, fromUnixTime } from 'date-fns';
-import { useTypedSelector } from '../../hooks/useRedux';
+import { useTypedDispatch, useTypedSelector } from '../../hooks/useRedux';
 import BottomSheet, { BottomSheetView } from '@gorhom/bottom-sheet';
 import VideoFilter from './components/VideoFilter';
 import { RecordedRangeCard } from './components/RecordedRangeCard';
+import { setVideos } from './slice/videoSlice';
 
 const HikVideoView = requireNativeComponent("HikVideoView");
 const { HikAuth, HikGetFile } = NativeModules;
@@ -22,20 +23,11 @@ enum Commands  {
 }
 
 
-export interface RecordRange { // Вынес интерфейс, чтобы использовать в RecordedRangeCard
+export interface RecordRange { 
     start: string;
     end: string;
 }
 
-// --- ТЕСТОВЫЕ ДАННЫЕ ДЛЯ RecordedRangeCard ---
-const TEST_RECORDED_RANGES: RecordRange[] = [
-    { start: "2026-04-07 08:05:00", end: "2026-04-07 08:15:00" },
-    { start: "2026-04-07 08:30:00", end: "2026-04-07 08:45:00" },
-    { start: "2026-04-07 09:00:00", end: "2026-04-07 09:10:00" },
-    { start: "2026-04-07 09:25:00", end: "2026-04-07 09:35:00" },
-    { start: "2026-04-07 09:40:00", end: "2026-04-07 09:55:00" },
-];
-// --- КОНЕЦ ТЕСТОВЫХ ДАННЫХ ---
 
 export default function Video() {
 	const {isFilterOpen, date, timeFrom, timeTo, videos} = useTypedSelector(state => state.videoReducer)
@@ -48,6 +40,7 @@ export default function Video() {
 	const [showRangeCards, setShowRangeCards] = useState<boolean>(false); // Для отображения/скрытия карточек
 	const videoPlayerRef = useRef(null)
 	const bottomSheetRef = useRef<BottomSheet>(null);
+	const dispatch = useTypedDispatch()
 
 	useEffect(() => {
 		if(isFilterOpen)
@@ -70,8 +63,9 @@ export default function Video() {
 
 		setShowRangeCards(true); // Показываем карточки после применения фильтра
 		// Нативной части отправляем формат с пробелом, как она ожидает
-		sendCommand('getVideo', [startTimeStr.replace('T', ' '), endTimeStr.replace('T', ' ')]);
-		setActivePlayerStatus(Commands.START);
+		loadFiles(startTimeStr.replace('T', ' '), endTimeStr.replace('T', ' '))
+		//sendCommand('getVideo', [startTimeStr.replace('T', ' '), endTimeStr.replace('T', ' ')]);
+		//setActivePlayerStatus(Commands.START);
 	}
 
 	const handlePlay = () => {
@@ -109,11 +103,12 @@ export default function Video() {
 	}
 
 
-	const loadFiles = async () => {
+	const loadFiles = async (startTime: string, endTime: string) => {
 		try {
-			const files = await HikGetFile.getFiles(1); // канал №1
+			const files = await HikGetFile.getFiles(1, startTime, endTime); // канал №1
 			console.log("Найдено файлов:", files.length);
 			console.log("Первый файл:", files[0]);
+			dispatch(setVideos(files))
 		} catch (e) {
 			console.error("Ошибка поиска:", e);
 		}
@@ -122,7 +117,7 @@ export default function Video() {
 	useEffect(() => {
 		if(process.env.NODE_ENV === "development"){
 			handleLogin();
-			loadFiles();
+			//loadFiles();
 		}
 	}, [])
 
@@ -187,7 +182,7 @@ export default function Video() {
 		if (videos && videos.length > 0 && videos[0].start && videos[0].end) {
 			return videos as RecordRange[];
 		}
-		return TEST_RECORDED_RANGES; // Если реальных данных нет, используем тестовые
+		return []
 	}, [videos]);
 
 	const handleSheetChanges = useCallback((index: number) => {

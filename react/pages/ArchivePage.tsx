@@ -1,5 +1,5 @@
 import React, {useMemo} from "react";
-import { StyleSheet, View } from "react-native";
+import { StyleSheet } from "react-native";
 import getColorByTheme from "../helpers/getColorByTheme";
 import { useTypedSelector } from "../hooks/useRedux";
 import Archive from "../modules/Archive/Archive";
@@ -8,10 +8,9 @@ import Animated from "react-native-reanimated";
 const ArchivePage = () => {
     const {theme} = useTypedSelector(state => state.settingsReducer);
     
-    // Простое вычисление цвета без анимации
+
     const backgroundColor = useMemo(() => getColorByTheme(theme), [theme]);
-    
-    // Динамический стиль с мемоизацией
+     
     const containerStyle = useMemo(() => [
         styles.wrapper, 
         { backgroundColor }

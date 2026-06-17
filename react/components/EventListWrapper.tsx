@@ -23,7 +23,7 @@ const EventListWrapper : FC<EventListWrapperProps> = ({children, footer, onEvent
     const { theme } = useTypedSelector(state => state.settingsReducer);
     const [disableItemsMode, toggleDisableItemsMode] = useToggle();
     const { width, height } = useWindowDimensions();
-    const heightWithoutPanel = useMemo(() => height - 130, [height]);
+    const heightWithoutPanel = useMemo(() => height - 70, [height]);
     const listStyle = useMemo(() => ({ height: heightWithoutPanel }), [heightWithoutPanel, width]);
     const modalStyle = useMemo(() => ({ width: width / 2 + 50 }), [width]);
 

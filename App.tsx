@@ -16,6 +16,8 @@ import { WebSocketProvider } from './react/modules/Websocket/websocket';
 import { View } from "react-native";
 import { colors } from "./constants/colors";
 
+import changeNavigationBarColor, {hideNavigationBar} from "react-native-navigation-bar-color"
+
 export default function App() {
 	const [permissionResponse, requestPermission] = MediaLibrary.usePermissions();
 
@@ -32,6 +34,8 @@ export default function App() {
 			}
 		}
 		asyncPermissions();
+		hideNavigationBar();
+		// changeNavigationBarColor"transparent", true);
 
 		
 	}, [])

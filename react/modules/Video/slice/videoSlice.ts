@@ -4,6 +4,7 @@ import { getCurrentTime } from "../../../helpers/getCurrentTime";
 import { cameraDirection } from "../../../types/cameraDirectionEnum";
 import { eventsEnum } from "../../../types/eventsEnum";
 import {getZero}  from "../../../helpers/getZero"
+import { RecordRange } from "../Video";
 
 const initialState: {
     date: string,
@@ -11,14 +12,10 @@ const initialState: {
     timeTo: string,
     loading: boolean,
     error: string | null,
-    videos: {
-        startTime: string,
-        endTime: string,
-        name: string,
-        size: number
-    }[],
+    videos: RecordRange[],
     cameraDirection: cameraDirection,
     isFilterOpen: boolean,
+    activeVideoName: string | null,
 } = {
     date: "",
     timeFrom: "",
@@ -28,6 +25,7 @@ const initialState: {
     videos: [],
     cameraDirection: cameraDirection.Top,
     isFilterOpen: false,
+    activeVideoName: null,
 }
 
 const videoSlice = createSlice({
@@ -42,6 +40,9 @@ const videoSlice = createSlice({
         },
         setVideos: (state, action) => {
             state.videos = action.payload;
+        },
+        setActiveVideoName: (state, action) => {
+            state.activeVideoName = action.payload;
         },
         setCurrentFilterValues: (state) => {
             state.date = getCurrentDate();
@@ -83,5 +84,6 @@ export const {
     setCurrentFilterValues, 
     setDate, 
     setTime,
-    changeVideoFilterValue
+    changeVideoFilterValue,
+    setActiveVideoName
 } = actions;

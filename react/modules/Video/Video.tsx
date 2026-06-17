@@ -1,5 +1,5 @@
-import { findNodeHandle, NativeModules, requireNativeComponent, StyleSheet, Text, View, UIManager } from 'react-native'
-import React, { useCallback, useEffect, useRef, useState, useMemo, ScrollView } from 'react'
+import { findNodeHandle, NativeModules, requireNativeComponent, StyleSheet, Text, View, UIManager, LayoutAnimation, Platform } from 'react-native'
+import React, { useCallback, useEffect, useRef, useState, useMemo } from 'react'
 import Slider from '@react-native-community/slider';
 import { colors } from '../../../constants/colors';
 import { PlayerActionButton } from './components/PlayerActionButton';
@@ -8,7 +8,8 @@ import { useTypedDispatch, useTypedSelector } from '../../hooks/useRedux';
 import BottomSheet, { BottomSheetView } from '@gorhom/bottom-sheet';
 import VideoFilter from './components/VideoFilter';
 import { RecordedRangeCard } from './components/RecordedRangeCard';
-import { setVideos } from './slice/videoSlice';
+import { setVideos, setActiveVideoName } from './slice/videoSlice';
+import { ScrollView } from 'react-native-gesture-handler';
 
 const HikVideoView = requireNativeComponent("HikVideoView");
 const { HikAuth, HikGetFile } = NativeModules;
@@ -24,20 +25,21 @@ enum Commands  {
 
 
 export interface RecordRange { 
-    start: string;
-    end: string;
+    startTime: string;
+    endTime: string;
+	size: number;
+	name: string;
 }
 
 
 export default function Video() {
-	const {isFilterOpen, date, timeFrom, timeTo, videos} = useTypedSelector(state => state.videoReducer)
+	const {isFilterOpen, date, timeFrom, timeTo, videos, activeVideoName} = useTypedSelector(state => state.videoReducer)
 	const [logId, setLogId] = useState<number>(0);
-	const [activePlayerStatus, setActivePlayerStatus] = useState<Commands>(Commands.STOP);
-	const [currentPosition, setCurrentPosition] = useState<number>(0); // Начальное значение 0
-	const [isSliding, setIsSliding] = useState<boolean>(false);
-	const [startTime, setStartTime] = useState<number>(0); // Начальное значение 0
-	const [endTime, setEndTime] = useState<number>(0);     // Начальное значение 0
-	const [showRangeCards, setShowRangeCards] = useState<boolean>(false); // Для отображения/скрытия карточек
+	const [activePlayerStatus, setActivePlayerStatus] = useState<Commands>(Commands.START);
+	const [currentPosition, setCurrentPosition] = useState<number>(0); 
+	const [startTime, setStartTime] = useState<number>(0); 
+	const [endTime, setEndTime] = useState<number>(0);    
+	const [showRangeCards, setShowRangeCards] = useState<boolean>(false); 
 	const videoPlayerRef = useRef(null)
 	const bottomSheetRef = useRef<BottomSheet>(null);
 	const dispatch = useTypedDispatch()
@@ -61,11 +63,8 @@ export default function Video() {
 		setEndTime(endTs);
 		setCurrentPosition(startTs);
 
-		setShowRangeCards(true); // Показываем карточки после применения фильтра
-		// Нативной части отправляем формат с пробелом, как она ожидает
+		setShowRangeCards(true); 
 		loadFiles(startTimeStr.replace('T', ' '), endTimeStr.replace('T', ' '))
-		//sendCommand('getVideo', [startTimeStr.replace('T', ' '), endTimeStr.replace('T', ' ')]);
-		//setActivePlayerStatus(Commands.START);
 	}
 
 	const handlePlay = () => {
@@ -164,26 +163,30 @@ export default function Video() {
 	};
 
 	const handleRangeCardPress = (range: RecordRange) => {
-		const rangeStartTs = new Date(range.start.replace(' ', 'T')).getTime() / 1000;
-		const rangeEndTs = new Date(range.end.replace(' ', 'T')).getTime() / 1000;
+		if (Platform.OS === 'android') {
+			LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+		}
+
+		const rangeStartTs = new Date(range.startTime.replace(' ', 'T')).getTime() / 1000;
+		const rangeEndTs = new Date(range.endTime.replace(' ', 'T')).getTime() / 1000;
 
 		setStartTime(rangeStartTs);
 		setEndTime(rangeEndTs);
 		setCurrentPosition(rangeStartTs);
-		setShowRangeCards(false); // Скрываем карточки после выбора
-
-		// Отправляем команду на перемотку в плеер
+		
+		dispatch(setActiveVideoName((range as any).name));
 		sendCommand('seekTo', [formatDisplayTime(rangeStartTs), formatDisplayTime(rangeEndTs)]);
 	};
 
-	// Используем actualVideos, если они есть, иначе TEST_RECORDED_RANGES для демонстрации
 	const displayedRanges = useMemo(() => {
-		// Убедимся, что videos содержит объекты с полями 'start' и 'end'
-		if (videos && videos.length > 0 && videos[0].start && videos[0].end) {
+		if (videos && videos.length > 0) {
 			return videos as RecordRange[];
 		}
 		return []
 	}, [videos]);
+
+	// Определяем, находится ли плеер в режиме "фокуса" (когда уже выбрано видео)
+	const isFocusMode = !!activeVideoName;
 
 	const handleSheetChanges = useCallback((index: number) => {
 		if(index === 0){
@@ -193,58 +196,70 @@ export default function Video() {
 
 	return (
 		<View style={styles.container}>
-			<HikVideoView 
-				ref={videoPlayerRef} 
-				style={{width: '100%', height: 370}} 
-				fileName = "ch01_00000200372000100" 
-				logId = {logId}
-				onProgress = {onVideoProgress} />
-			<View style={{paddingHorizontal: 10}}>
-				<View style={[styles.playerContainer, {width: "100%", marginTop: 10}]}>
-					<Slider 
-						style={{flex: 1}} // Slider занимает всю доступную ширину
-						step={1}
-						minimumValue={startTime}
-						maximumValue={endTime}
-						currentPosition={currentPosition}
-						value={currentPosition}
-						onSlidingStart={() => setIsSliding(true)}
-						onValueChange={(value) => setCurrentPosition(value)}
-						onSlidingComplete={(value) => {
-							setIsSliding(false);
-							handleTimelineSeek(value); // Передаем только время начала, endTime остается текущим
-						}}
-						minimumTrackTintColor={colors.lightblue}
-						maximumTrackTintColor={colors.deepblue}
-						thumbTintColor={colors.lightblue}
-					/>
+			<View style={{width: "70%"}}>
+				<HikVideoView 
+					ref={videoPlayerRef} 
+					style={{width: "100%", height: 380}} 
+					fileName = {activeVideoName} 
+					logId = {logId}
+					onProgress = {onVideoProgress} />
+				<View style={{paddingHorizontal: 10}}>
+					<View style={[styles.playerContainer, {width: "100%", marginTop: 10}]}>
+						<Slider 
+							style={{flex: 1}} 
+							step={0.1}
+							minimumValue={0}
+							maximumValue={100}
+							value={endTime - startTime > 0 ? ((currentPosition - startTime) / (endTime - startTime)) * 100 : 0}
+							onValueChange={(value) => {
+								// Рассчитываем время на основе процента для обновления текстовых меток
+								const targetTime = startTime + (value / 100) * (endTime - startTime);
+								setCurrentPosition(targetTime);
+							}}
+							onSlidingComplete={(value) => {
+								const targetTime = startTime + (value / 100) * (endTime - startTime);
+								handleTimelineSeek(targetTime); 
+							}}
+							minimumTrackTintColor={colors.lightblue}
+							maximumTrackTintColor={colors.deepblue}
+							thumbTintColor={colors.lightblue}
+						/>
+					</View>
+
+					<View style={{display: "flex", flexDirection: "row", justifyContent: "space-between", width: "100%", paddingHorizontal: 10}}>
+						<View style={[styles.playerContainer, {marginTop: 10, width: "40%"}]}>
+							<View style={{display: "flex", flexDirection: "row", gap: 25, justifyContent: "center", alignItems: "center"}}>
+								{renderActiveButton()} 
+								<PlayerActionButton type="download" onPress={() => sendCommand('download')}/>                                       
+							</View>                               
+						</View>
+						<View style={[styles.playerTimeContainer, {marginTop: 0}]}>
+							<Text style={styles.playerTimeText}>{formatTime(currentPosition)}</Text>
+							<Text style={styles.playerTimeText}> / </Text>
+							<Text style={styles.playerTimeText}>{formatTime(endTime)}</Text>
+						</View>						
+					</View>
+
 				</View>
+			</View>
+			<View style={[styles.listWrapper]}>
 				{showRangeCards && displayedRanges.length > 0 && (
 					<View style={styles.rangeCardsContainer}>
-						<Text style={styles.rangeCardsTitle}>Доступные записи:</Text>
-						<View >
+						<Text style={styles.rangeCardsTitle}>
+							ДОСТУПНЫЕ ЗАПИСИ
+						</Text>
+						<ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>								
 							{displayedRanges.map((range, index) => (
-								<RecordedRangeCard key={index} range={range} onPress={handleRangeCardPress} />
+								<RecordedRangeCard 
+									key={index} 
+									range={range} 
+									isActive={activeVideoName === (range as any).name}
+									onPress={handleRangeCardPress} 
+								/>
 							))}
-						</View>
+						</ScrollView>
 					</View>
 				)}
-				<View style={[styles.playerTimeContainer, {marginTop: 5}]}>
-					<Text style={styles.playerTimeText}>{formatTime(currentPosition)}</Text>
-					<Text style={styles.playerTimeText}> / </Text>
-					<Text style={styles.playerTimeText}>{formatTime(endTime)}</Text>
-				</View>
-				<View style={[styles.playerContainer, {marginTop: 15}]}>
-					<View style={{width: "33%", display: "flex", justifyContent: "flex-start", alignItems: "center"}} />
-					<View style={{width: "33%", display: "flex", flexDirection: "row", gap: 15, justifyContent: "center", alignItems: "center"}}>
-						<PlayerActionButton color={colors.lightgrey} type="fast-backward" onPress={() => {}}/>
-						{renderActiveButton()} 
-						<PlayerActionButton color={colors.lightgrey} type="fast-forward" onPress={() => {}}/>
-					</View>
-					<View style={{width: "33%", display: "flex", justifyContent: "flex-end", alignItems: "flex-end"}}>
-						<PlayerActionButton type="download" onPress={() => sendCommand('download')}/>                                       
-					</View>                                    
-				</View>
 			</View>
 
 			<BottomSheet
@@ -264,12 +279,29 @@ export default function Video() {
 const styles = StyleSheet.create({
 	container: {
 		position: "relative",
+		display: "flex",
+		justifyContent: "center",
+		alignItems: "center",
+		width: "100%",
+		height: "100%",
+		flexDirection: "row"
 	},
 	playerContainer: {
 		display: 'flex',
 		flexDirection: 'row',
-		justifyContent: 'center',
-		alignItems: 'center',
+		justifyContent: 'flex-start',
+		alignItems: 'flex-start',
+	},
+	listWrapper: {
+		width: "30%",
+		height: "100%",
+		backgroundColor: 'rgba(20, 20, 25, 0.4)',
+		borderLeftWidth: 1,
+		borderLeftColor: 'rgba(255, 255, 255, 0.1)',
+		paddingTop: 10,
+	},
+	listWrapperActive: {
+		backgroundColor: 'rgba(10, 10, 15, 0.95)',
 	},
 	playerTimeContainer: {
 		flexDirection: 'row',
@@ -288,19 +320,21 @@ const styles = StyleSheet.create({
         elevation: 100
     },
     rangeCardsContainer: {
-        marginTop: 15,
-        marginBottom: 5,
-        paddingVertical: 10,
-        backgroundColor: 'rgba(255, 255, 255, 0.05)', // Легкое выделение фона
-        borderRadius: 12,
+        flex: 1,
     },
     rangeCardsTitle: {
-        color: colors.white,
-        fontSize: 14,
-        fontWeight: '600',
-        marginLeft: 10,
-        marginBottom: 8,
-        opacity: 0.8,
+        color: colors.lightblue,
+        fontSize: 12,
+        fontWeight: '800',
+        letterSpacing: 1.2,
+        marginLeft: 15,
+        marginBottom: 15,
+        opacity: 0.9,
     },
+	scrollContent: {
+		paddingHorizontal: 10,
+		paddingBottom: 20,
+		gap: 8
+	},
 	
 })

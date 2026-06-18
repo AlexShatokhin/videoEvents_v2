@@ -10,7 +10,7 @@ import ModalEvent from "./ModalEvent/ModalEvent";
 import { colors } from "../../constants/colors";
 import EventItem from "./EventItems/EventItem";
 import { EventInformationType } from "../types/eventInformationType";
-import { MaterialIcons } from "@expo/vector-icons";
+import { FontAwesome6, MaterialIcons } from "@expo/vector-icons";
 
 interface EventListWrapperProps {
     footer?: () => React.JSX.Element;
@@ -18,10 +18,12 @@ interface EventListWrapperProps {
     onEventSelect: (event: EventInformationType) => void;
     events: EventInformationType[];
     selectedEventItem: EventInformationType | undefined;
-    error?: string | null
+    error?: string | null,
+    initialText?: React.ReactNode | null,
+    loadingStatus?: string;
 }
 
-const EventListWrapper : FC<EventListWrapperProps> = ({children, footer, onEventSelect, events, selectedEventItem, error = null}) => {
+const EventListWrapper : FC<EventListWrapperProps> = ({children, footer, onEventSelect, events, selectedEventItem, error = null, initialText = null, loadingStatus}) => {
     const { theme } = useTypedSelector(state => state.settingsReducer);
     const [disableItemsMode, toggleDisableItemsMode] = useToggle();
     const { width, height } = useWindowDimensions();
@@ -31,23 +33,25 @@ const EventListWrapper : FC<EventListWrapperProps> = ({children, footer, onEvent
 
     useConnectionCheck();
 
-    console.log(error)
-    const renderEmptyOrError = () => {
-            if (error) {
-                return (
-                    <View style={styles.centerContainer}>
-                        <MaterialIcons name="error-outline" size={60} color={colors.red} />
-                        <Text style={styles.errorText}>{error}</Text>
-                    </View>
-                );
-            }
-            
-            return (
-                <View style={styles.centerContainer}>
-                    <Text style={styles.emptyText}>Нет доступных событий</Text>
-                </View>
-            );
-        };
+    const renderError = () => (
+        <View style={styles.centerContainer}>
+            <MaterialIcons name="error-outline" size={60} color={colors.red} />
+            <Text style={styles.errorText}>{error}</Text>
+        </View>
+    );
+
+    const renderPlaceholder = useCallback(() => {
+        const isInitialStage = events.length === 0 && (!loadingStatus || loadingStatus === 'initial');
+        const content = (isInitialStage && initialText) ? initialText : "Нет доступных событий";
+
+        return (
+            <View style={styles.centerContainer}>
+                <Text style={styles.emptyText}>
+                    {content}
+                </Text>
+            </View>
+        );
+    }, [events.length, loadingStatus, initialText]);
 
     const renderItem = useCallback(({ item: event, index }: { item: EventInformationType, index: number }) => (
         <EventItem 
@@ -74,7 +78,7 @@ const EventListWrapper : FC<EventListWrapperProps> = ({children, footer, onEvent
                 </Stack>
 
                 {error && events.length === 0 ? (
-                    renderEmptyOrError()
+                    renderError()
                 ) : (
                     <FlatList 
                         data={events}
@@ -84,7 +88,7 @@ const EventListWrapper : FC<EventListWrapperProps> = ({children, footer, onEvent
                         style={listStyle}
                         showsVerticalScrollIndicator={false}
                         ListFooterComponent={footer}
-                        ListEmptyComponent={renderEmptyOrError} 
+                        ListEmptyComponent={loadingStatus !== "loading" ? renderPlaceholder : null} 
                         initialNumToRender={15}
                         maxToRenderPerBatch={10}
                         windowSize={21}
@@ -133,8 +137,10 @@ const styles = StyleSheet.create({
         marginTop: 10,
     },
     emptyText: {
-        fontSize: 16,
-        color: colors.grey,
+        fontSize: 19,
+        fontWeight: 'bold',
+        color: colors.lightgrey,
         textAlign: 'center',
+        opacity: 0.5
     }    
 })

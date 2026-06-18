@@ -1,6 +1,6 @@
 
 import React, { useCallback, useEffect, useRef } from "react"
-import { StyleSheet } from "react-native"
+import { StyleSheet, Text } from "react-native"
 import { useTypedSelector, useTypedDispatch } from "../../hooks/useRedux"
 import { eventsFetch, selectEvent } from "./slice/archiveSlice"
 import { useConnectionCheck } from "../../hooks/useConnectionCheck"
@@ -10,6 +10,8 @@ import { EventInformationType } from "../../types/eventInformationType"
 import EventListWrapper from "../../components/EventListWrapper";
 import { setFilterVisibility } from "./components/FilterComponents/FilterSlice"
 import ArchiveListFooter from "./components/ArchiveListFooter/ArchiveListFooter"
+import { FontAwesome6 } from "@expo/vector-icons"
+import { colors } from "../../../constants/colors"
 
 const Archive = () => {
 
@@ -40,7 +42,7 @@ const Archive = () => {
         if(index === -1){
             dispatch(setFilterVisibility(false))
         }
-    }, []);
+    }, [dispatch]);
 
     const handleSelectEvent = useCallback((event: EventInformationType) => dispatch(selectEvent(event)), [dispatch])
     const handleMorePress = useCallback(() => dispatch(eventsFetch(searchPosition)), [dispatch, searchPosition])
@@ -56,10 +58,16 @@ const Archive = () => {
 
     return (
         <EventListWrapper 
+            loadingStatus={loadingStatus}
             footer={renderFooter} 
             error = {error}
             onEventSelect={handleSelectEvent} 
             events={events} 
+            initialText={
+                <>
+                    Нажмите на иконку <FontAwesome6 name="filter" color={colors.lightblue} style={{opacity: "0.3"}} size={20}/> выше, чтобы получить события
+                </>
+            }
             selectedEventItem={selectedEvent}>
 
             <BottomSheet

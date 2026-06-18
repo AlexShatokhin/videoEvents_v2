@@ -14,6 +14,8 @@ class HikGetFileModule(reactContext: ReactApplicationContext) : ReactContextBase
     fun getFiles(channel: Int, startTime: String, endTime: String, promise: Promise) {
         val fileList = Arguments.createArray()
 
+        Log.i("HikDebug", "Channel: " + channel)
+
         val userID = SDKGuider.g_sdkGuider.m_iLogID
         if (userID < 0) {
             promise.reject("ERR_AUTH", "Пользователь не авторизован")

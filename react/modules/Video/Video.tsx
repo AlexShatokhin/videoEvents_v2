@@ -10,6 +10,7 @@ import VideoFilter from './components/VideoFilter';
 import { RecordedRangeCard } from './components/RecordedRangeCard';
 import { setVideos, setActiveVideoName } from './slice/videoSlice';
 import { ScrollView } from 'react-native-gesture-handler';
+import {cameraDirection as cameraDirectionEnum} from "../../types/cameraDirectionEnum"
 
 const HikVideoView = requireNativeComponent("HikVideoView");
 const { HikAuth, HikGetFile } = NativeModules;
@@ -33,7 +34,7 @@ export interface RecordRange {
 
 
 export default function Video() {
-	const {isFilterOpen, date, timeFrom, timeTo, videos, activeVideoName} = useTypedSelector(state => state.videoReducer)
+	const {isFilterOpen, date, timeFrom, timeTo, videos, activeVideoName, cameraDirection} = useTypedSelector(state => state.videoReducer)
 	const [logId, setLogId] = useState<number>(0);
 	const [activePlayerStatus, setActivePlayerStatus] = useState<Commands>(Commands.START);
 	const [currentPosition, setCurrentPosition] = useState<number>(0); 
@@ -102,9 +103,22 @@ export default function Video() {
 	}
 
 
+	const convertCameraDirectionToNum = () => {
+		switch(cameraDirection){
+			case cameraDirectionEnum.Top: return 34;
+			case cameraDirectionEnum.Back: return 33;
+			case cameraDirectionEnum.TopLeft: return 35;
+			case cameraDirectionEnum.BackLeft: return 36;
+			case cameraDirectionEnum.TopRight: return 37;
+			case cameraDirectionEnum.BackRight: return 38;
+			default: return 34;
+
+		}
+	}
+
 	const loadFiles = async (startTime: string, endTime: string) => {
 		try {
-			const files = await HikGetFile.getFiles(1, startTime, endTime); // канал №1
+			const files = await HikGetFile.getFiles(convertCameraDirectionToNum(), startTime, endTime); // канал №1
 			console.log("Найдено файлов:", files.length);
 			console.log("Первый файл:", files[0]);
 			dispatch(setVideos(files))
@@ -175,7 +189,7 @@ export default function Video() {
 		setCurrentPosition(rangeStartTs);
 		
 		dispatch(setActiveVideoName((range as any).name));
-		sendCommand('seekTo', [formatDisplayTime(rangeStartTs), formatDisplayTime(rangeEndTs)]);
+		sendCommand('getVideo', [convertCameraDirectionToNum(), formatDisplayTime(rangeStartTs), formatDisplayTime(rangeEndTs)]);
 	};
 
 	const displayedRanges = useMemo(() => {

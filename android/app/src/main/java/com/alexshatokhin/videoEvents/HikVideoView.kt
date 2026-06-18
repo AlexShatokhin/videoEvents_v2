@@ -63,13 +63,16 @@ class HikVideoView(context: Context) : TextureView(context), TextureView.Surface
         this.mFileName = fileName
     }
 
-    fun checkAndStart(){
+    fun checkAndStart(channel: Int, startTime : String, stopTime: String){
         Log.e("HikDebug", "Сработал метод проверки")
         Log.e("HikDebug", "FileName:" + mFileName)
         Log.e("HikDebug", "LogId: " + mLogId)
         Log.e("HikDebug", "isSurfaceready: " + isSurfaceReady)
-        if(mFileName.isNotEmpty() && mLogId != -1 && isSurfaceReady)
-            startPlaybackByTime("2026-04-07 8:50:00", "2026-04-07 9:30:00")
+        if(mFileName.isNotEmpty() && mLogId != -1 && isSurfaceReady){
+            stopPlay()
+            startPlaybackByTime(channel, startTime, stopTime)
+        }
+
     }
 
     private fun isPlaybackExists() : Boolean{
@@ -81,7 +84,7 @@ class HikVideoView(context: Context) : TextureView(context), TextureView.Surface
         return true
     }
 
-    fun startPlaybackByTime(startTimeString: String, endTimeString: String) {
+    fun startPlaybackByTime(channel: Int, startTimeString: String, endTimeString: String) {
         // Проверяем, что Surface создан и готов к работе
         if (mSurface == null || !mSurface!!.isValid) {
             Log.e("HikDebug", "Ошибка: Surface не готов для воспроизведения")
@@ -128,6 +131,7 @@ class HikVideoView(context: Context) : TextureView(context), TextureView.Surface
             }
 
             playbackId = SDKGuider.g_sdkGuider.m_comPBGuider.PlayBackByTime_v40_jni(deviceInfo.m_lUserID, vodParam)
+            this.channel = channel
 
             if (playbackId < 0) {
                 val error = SDKGuider.g_sdkGuider.GetLastError_jni()
@@ -201,7 +205,7 @@ class HikVideoView(context: Context) : TextureView(context), TextureView.Surface
     fun seekTo(time : String, stopTime: String){
         Log.i("HikDebug", "Перемотка на $time до $stopTime")
         stopPlay()
-        startPlaybackByTime(time, stopTime)
+        startPlaybackByTime(channel, time, stopTime)
     }
 
     fun download(){
@@ -321,7 +325,7 @@ class HikVideoView(context: Context) : TextureView(context), TextureView.Surface
         // Создаем Surface на основе полученной текстуры
         mSurface = Surface(surfaceTexture)
         isSurfaceReady = true
-        checkAndStart() // Проверяем, готовы ли параметры для автостарта
+
     }
 
     override fun onSurfaceTextureSizeChanged(surfaceTexture: SurfaceTexture, width: Int, height: Int) {

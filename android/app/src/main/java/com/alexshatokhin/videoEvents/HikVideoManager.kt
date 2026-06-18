@@ -40,7 +40,6 @@ class HikVideoManager : SimpleViewManager<HikVideoView>() {
         when (commandId){
             "play" -> {
                 Log.i("HikDebug", "PLAY")
-                view.checkAndStart()
             }
             "continue" -> {
                 view.continuePlay()
@@ -52,11 +51,12 @@ class HikVideoManager : SimpleViewManager<HikVideoView>() {
                 view.download()
             }
             "getVideo" -> {
-                val timeFrom = args?.getString(0)
-                val timeTo = args?.getString(1)
+                val channel = args?.getInt(0)
+                val timeFrom = args?.getString(1)
+                val timeTo = args?.getString(2)
                 Log.i("HikDebug", "Получение видео " + timeFrom + " - " + timeTo)
-                if(timeFrom != null && timeTo != null){
-                    view.checkAndStart()
+                if(timeFrom != null && timeTo != null && channel != null){
+                    view.checkAndStart(channel, timeFrom, timeTo)
                 }
 
             }

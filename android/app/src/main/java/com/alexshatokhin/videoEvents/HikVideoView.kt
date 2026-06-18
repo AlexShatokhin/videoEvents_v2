@@ -1,10 +1,9 @@
-package com.alexshatokhin.videoEvents;
+package com.alexshatokhin.videoEvents
 
 import android.content.Context
-import android.graphics.PixelFormat
-import android.view.SurfaceHolder
-import android.view.SurfaceView
-
+import android.graphics.SurfaceTexture
+import android.view.TextureView
+import android.view.Surface
 import android.util.Log
 import com.hikvision.Control.SDKGuider
 
@@ -27,14 +26,13 @@ import java.util.Date
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 
-import android.view.Surface
 import com.hikvision.netsdk.*
 import java.util.*
 
-class HikVideoView(context: Context) : SurfaceView(context), SurfaceHolder.Callback {
+// 1. Меняем наследование на TextureView и реализуем TextureView.SurfaceTextureListener
+class HikVideoView(context: Context) : TextureView(context), TextureView.SurfaceTextureListener {
 
-
-    private var fileName : String = "ch01_00000200372000100" //ch01_00000200517000000
+    private var fileName : String = "ch01_00000200372000100"
     private var mLogId: Int = -1
     private var mFileName: String = ""
     private var playbackId: Int = -1
@@ -47,16 +45,18 @@ class HikVideoView(context: Context) : SurfaceView(context), SurfaceHolder.Callb
 
     private var channel = 2
 
-    init {
-        holder.addCallback(this)
-        setZOrderOnTop(true)
-        holder.setFormat(PixelFormat.TRANSLUCENT)
-    }
+    // Храним ссылку на созданный Surface
+    private var mSurface: Surface? = null
 
+    init {
+        // 2. Настраиваем слушатель жизненного цикла текстуры
+        surfaceTextureListener = this
+
+        // setZOrderOnTop(true) БОЛЬШЕ НЕ НУЖЕН! TextureView управляется через стандартный UI/ZIndex в RN
+    }
 
     fun setLogId(logId: Int) {
         this.mLogId = logId
-        //checkAndStart()
     }
 
     fun setFileName(fileName: String) {
@@ -71,6 +71,7 @@ class HikVideoView(context: Context) : SurfaceView(context), SurfaceHolder.Callb
         if(mFileName.isNotEmpty() && mLogId != -1 && isSurfaceReady)
             startPlaybackByTime("2026-04-07 8:50:00", "2026-04-07 9:30:00")
     }
+
     private fun isPlaybackExists() : Boolean{
         if(playbackId == -1){
             Log.e("HikDebug","Запись не запущена")
@@ -81,12 +82,17 @@ class HikVideoView(context: Context) : SurfaceView(context), SurfaceHolder.Callb
     }
 
     fun startPlaybackByTime(startTimeString: String, endTimeString: String) {
-        val deviceInfo = SDKGuider.g_sdkGuider.m_comDMGuider.getCurrSelectDev();
+        // Проверяем, что Surface создан и готов к работе
+        if (mSurface == null || !mSurface!!.isValid) {
+            Log.e("HikDebug", "Ошибка: Surface не готов для воспроизведения")
+            return
+        }
 
+        val deviceInfo = SDKGuider.g_sdkGuider.m_comDMGuider.getCurrSelectDev();
         val timeStart = NET_DVR_TIME()
         val timeStop = NET_DVR_TIME()
-
         val sdf = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.CHINA)
+
         Log.i("HikDebug", "UserID in device Info: " + deviceInfo.m_lUserID)
         try {
             val startDoc = sdf.parse(startTimeString)
@@ -100,32 +106,26 @@ class HikVideoView(context: Context) : SurfaceView(context), SurfaceHolder.Callb
             val calStart = Calendar.getInstance().apply { time = startDoc }
             val calEnd = Calendar.getInstance().apply { time = endDoc }
 
-
             if (calEnd.before(calStart)) {
                 Log.e("HikDebug", "Конечное время меньше начального")
-
                 return
             }
 
-
             SDKGuider.g_sdkGuider.m_comPBGuider.ConvertToTime(timeStart, calStart)
             SDKGuider.g_sdkGuider.m_comPBGuider.ConvertToTime(timeStop, calEnd)
-
 
             val vodParam = NET_DVR_VOD_PARA().apply {
                 struBeginTime = timeStart
                 struEndTime = timeStop
                 byStreamType = 1.toByte()
                 struIDInfo.dwChannel = channel
-                hWnd = holder.surface
+                hWnd = mSurface // 3. Передаем наш сохраненный mSurface
             }
-
 
             if (playbackId != -1) {
                 Log.w("HikDebug", "Воспроизведение уже запущено, сначала остановите его")
                 return
             }
-
 
             playbackId = SDKGuider.g_sdkGuider.m_comPBGuider.PlayBackByTime_v40_jni(deviceInfo.m_lUserID, vodParam)
 
@@ -134,7 +134,6 @@ class HikVideoView(context: Context) : SurfaceView(context), SurfaceHolder.Callb
                 Log.e("HikDebug", "Ошибка PlayBackByTime: $error")
             } else {
                 Log.d("HikDebug", "Воспроизведение по времени запущено успешно, ID: $playbackId")
-
             }
 
         } catch (e: Exception) {
@@ -142,12 +141,12 @@ class HikVideoView(context: Context) : SurfaceView(context), SurfaceHolder.Callb
         }
     }
 
-
-    fun startPlay(logId: Int, fileName: String, holder : SurfaceHolder){
-        Log.d("HikDebug", "Surface valid: ${holder.surface.isValid}")
+    // 4. Обновленный метод старта по имени (теперь принимает чистый Surface, а не Holder)
+    fun startPlay(logId: Int, fileName: String, surface: Surface){
+        Log.d("HikDebug", "Surface valid: ${surface.isValid}")
 
         playbackLock.withLock {
-            playbackId = SDKGuider.g_sdkGuider.m_comPBGuider.PlayBackByName_jni(logId, fileName, holder.surface)
+            playbackId = SDKGuider.g_sdkGuider.m_comPBGuider.PlayBackByName_jni(logId, fileName, surface)
             if(isPlaybackExists())
                 Log.i("HikDebug", "Playback найден (${playbackId})")
 
@@ -155,14 +154,11 @@ class HikVideoView(context: Context) : SurfaceView(context), SurfaceHolder.Callb
                 startTimer()
             }
         }
-
-
     }
+
     fun continuePlay(){
         Log.i("HikDebug", "Продолжение")
-        if(!isPlaybackExists()){
-            return
-        }
+        if(!isPlaybackExists()) return
         playbackLock.withLock {
             val result = SDKGuider.g_sdkGuider.m_comPBGuider.PlayBackContinueByTime_v40_jni(mLogId, playbackId)
             if(result != -1){
@@ -171,14 +167,11 @@ class HikVideoView(context: Context) : SurfaceView(context), SurfaceHolder.Callb
                 Log.e("HikDebug","Ошибка записи " + SDKGuider.g_sdkGuider.GetLastError_jni())
             }
         }
-
-
     }
+
     fun pausePlay(){
         Log.i("HikDebug", "Пауза")
-        if(!isPlaybackExists()){
-            return
-        }
+        if(!isPlaybackExists()) return
 
         playbackLock.withLock {
             val result = SDKGuider.g_sdkGuider.m_comPBGuider.PlayBackPauseByTime_v40_jni(mLogId, playbackId)
@@ -188,13 +181,11 @@ class HikVideoView(context: Context) : SurfaceView(context), SurfaceHolder.Callb
                 Log.e("HikDebug","Ошибка паузы " + SDKGuider.g_sdkGuider.GetLastError_jni())
             }
         }
-
     }
+
     fun stopPlay(){
         Log.i("HikDebug", "Стоп")
-        if(!isPlaybackExists()){
-            return
-        }
+        if(!isPlaybackExists()) return
 
         playbackLock.withLock {
             val result = SDKGuider.g_sdkGuider.m_comPBGuider.StopPlayBack_jni(playbackId)
@@ -205,13 +196,14 @@ class HikVideoView(context: Context) : SurfaceView(context), SurfaceHolder.Callb
                 Log.e("HikDebug","Ошибка остановки " + SDKGuider.g_sdkGuider.GetLastError_jni())
             }
         }
-
     }
+
     fun seekTo(time : String, stopTime: String){
         Log.i("HikDebug", "Перемотка на $time до $stopTime")
         stopPlay()
         startPlaybackByTime(time, stopTime)
     }
+
     fun download(){
         Log.i("HikDebug", "Скачивание")
         if(downloadHandle != -1){
@@ -220,23 +212,12 @@ class HikVideoView(context: Context) : SurfaceView(context), SurfaceHolder.Callb
                 downloadHandle = -1;
             }
         }
-/*
-        val date = SimpleDateFormat("yyyyMMddhhssmm").format(Date())
-        val strFileName = "lustra_" + date
-        downloadHandle = SDKGuider.g_sdkGuider.m_comPBGuider.GetFileByName_jni(mLogId,mFileName, "/mnt/sdcard/download/"+strFileName+".mp4")
-        if(downloadHandle == -1){
-            Log.e("HikDebug", "Ошибка скачивания")
-        } else {
-            startDownload()
-        }
 
-*/
         val startTimeString = "2026-04-07 8:50:00"
         val endTimeString = "2026-04-07 9:30:00"
 
         val timeStart = NET_DVR_TIME()
         val timeStop = NET_DVR_TIME()
-
         val sdf = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.CHINA)
         try {
             val startDoc = sdf.parse(startTimeString)
@@ -250,13 +231,10 @@ class HikVideoView(context: Context) : SurfaceView(context), SurfaceHolder.Callb
             val calStart = Calendar.getInstance().apply { time = startDoc }
             val calEnd = Calendar.getInstance().apply { time = endDoc }
 
-
             if (calEnd.before(calStart)) {
                 Log.e("HikDebug", "Конечное время меньше начального при скачивании")
-
                 return
             }
-
 
             SDKGuider.g_sdkGuider.m_comPBGuider.ConvertToTime(timeStart, calStart)
             SDKGuider.g_sdkGuider.m_comPBGuider.ConvertToTime(timeStop, calEnd)
@@ -274,30 +252,27 @@ class HikVideoView(context: Context) : SurfaceView(context), SurfaceHolder.Callb
         } catch (e: Exception) {
             Log.e("HikDebug", "Исключение при запуске Playback: ${e.message}")
         }
-
-
     }
 
     fun emitVideoProgress() {
         playbackLock.withLock {
+            if (playbackId == -1) return
             progress = SDKGuider.g_sdkGuider.m_comPBGuider.GetPlayBackPos_jni(playbackId)
 
-            if(progress < 0)
-                return
+            if(progress < 0) return
 
             val event = Arguments.createMap()
             event.putInt("currentProgress", progress)
 
             val reactContext = context as ReactContext
-            reactContext.getJSModule(
-                RCTEventEmitter::class.java).receiveEvent(
+            reactContext.getJSModule(RCTEventEmitter::class.java).receiveEvent(
                 this.id,
                 "topVideoProgress",
                 event
             )
         }
-
     }
+
     fun emitVideoDownloadProgress() {
         downloadLock.withLock {
             downloadProgress = SDKGuider.g_sdkGuider.m_comPBGuider.GetDownloadPos_jni(downloadHandle)
@@ -313,11 +288,8 @@ class HikVideoView(context: Context) : SurfaceView(context), SurfaceHolder.Callb
                 SDKGuider.g_sdkGuider.m_comPBGuider.StopGetFile_jni(downloadHandle);
                 Log.i("HikDebug", "Скачивание завершено успешно!")
             }
-
         }
-
     }
-
 
     private val handler = Handler(Looper.getMainLooper())
     private val progressRunnable = object : Runnable {
@@ -325,7 +297,6 @@ class HikVideoView(context: Context) : SurfaceView(context), SurfaceHolder.Callb
             if (playbackId != -1) {
                 emitVideoProgress()
             }
-
             handler.postDelayed(this, 700)
         }
     }
@@ -334,46 +305,42 @@ class HikVideoView(context: Context) : SurfaceView(context), SurfaceHolder.Callb
             if (downloadHandle != -1) {
                 emitVideoDownloadProgress()
             }
-
             handler.postDelayed(this, 1000)
         }
     }
 
-    fun startTimer() {
-        handler.post(progressRunnable)
-    }
-
-    fun stopTimer() {
-        handler.removeCallbacks(progressRunnable)
-    }
-
-    fun startDownload(){
-        handler.post(downloadProgressRunnable)
-    }
-
-    fun stopDownload(){
-        handler.removeCallbacks(downloadProgressRunnable)
-    }
+    fun startTimer() { handler.post(progressRunnable) }
+    fun stopTimer() { handler.removeCallbacks(progressRunnable) }
+    fun startDownload(){ handler.post(downloadProgressRunnable) }
+    fun stopDownload(){ handler.removeCallbacks(downloadProgressRunnable) }
 
 
+    // === 5. РЕАЛИЗАЦИЯ МЕТОДОВ TextureView.SurfaceTextureListener ===
 
-    override fun surfaceChanged(
-        holder: SurfaceHolder,
-        format: Int,
-        width: Int,
-        height: Int
-    ) {
-
-    }
-
-    override fun surfaceCreated(holder: SurfaceHolder) {
+    override fun onSurfaceTextureAvailable(surfaceTexture: SurfaceTexture, width: Int, height: Int) {
+        // Создаем Surface на основе полученной текстуры
+        mSurface = Surface(surfaceTexture)
         isSurfaceReady = true
+        checkAndStart() // Проверяем, готовы ли параметры для автостарта
     }
 
-    override fun surfaceDestroyed(holder: SurfaceHolder) {
+    override fun onSurfaceTextureSizeChanged(surfaceTexture: SurfaceTexture, width: Int, height: Int) {
+        // Игнорируем или обрабатываем ресайз, если необходимо
+    }
+
+    override fun onSurfaceTextureDestroyed(surfaceTexture: SurfaceTexture): Boolean {
         isSurfaceReady = false
         stopTimer()
         stopPlay()
+
+        // Освобождаем нативный Surface
+        mSurface?.release()
+        mSurface = null
+
+        return true // Система сама очистит внутренний SurfaceTexture
     }
 
+    override fun onSurfaceTextureUpdated(surfaceTexture: SurfaceTexture) {
+        // Вызывается при обновлении кадров, оставляем пустым
+    }
 }

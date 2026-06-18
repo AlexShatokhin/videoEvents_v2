@@ -1,28 +1,26 @@
 
 import React, { useCallback, useEffect, useRef } from "react"
-import { StyleSheet } from "react-native"
-import { ActivityIndicator } from "@react-native-material/core"
-import { colors } from "../../../constants/colors"
-
+import { StyleSheet, Text } from "react-native"
 import { useTypedSelector, useTypedDispatch } from "../../hooks/useRedux"
 import { eventsFetch, selectEvent } from "./slice/archiveSlice"
-
-import MoreButton from "./UI/MoreButton"
 import { useConnectionCheck } from "../../hooks/useConnectionCheck"
-
 import BottomSheet, { BottomSheetView } from '@gorhom/bottom-sheet';
 import Filters from "./components/Filters"
 import { EventInformationType } from "../../types/eventInformationType"
 import EventListWrapper from "../../components/EventListWrapper";
+import { setFilterVisibility } from "./components/FilterComponents/FilterSlice"
+import ArchiveListFooter from "./components/ArchiveListFooter/ArchiveListFooter"
+import { FontAwesome6 } from "@expo/vector-icons"
+import { colors } from "../../../constants/colors"
 
 const Archive = () => {
-    const {
-        loadingStatus,
-        more,
-        searchPosition,
-        selectedEvent,
-        events
-    } = useTypedSelector(state => state.archiveReducer);
+
+    const events = useTypedSelector(state => state.archiveReducer.events);
+    const selectedEvent = useTypedSelector(state => state.archiveReducer.selectedEvent);
+    const error = useTypedSelector(state => state.archiveReducer.error);
+    const more = useTypedSelector(state => state.archiveReducer.more);
+    const loadingStatus = useTypedSelector(state => state.archiveReducer.loadingStatus);
+    const searchPosition = useTypedSelector(state => state.archiveReducer.searchPosition);
     const {isOpen} = useTypedSelector(state => state.filterReducer)
     const dispatch = useTypedDispatch();
     const bottomSheetRef = useRef<BottomSheet>(null);
@@ -41,30 +39,40 @@ const Archive = () => {
         if(index === 0){
             bottomSheetRef.current?.snapToIndex(0)
         }
-    }, []);
+        if(index === -1){
+            dispatch(setFilterVisibility(false))
+        }
+    }, [dispatch]);
 
     const handleSelectEvent = useCallback((event: EventInformationType) => dispatch(selectEvent(event)), [dispatch])
     const handleMorePress = useCallback(() => dispatch(eventsFetch(searchPosition)), [dispatch, searchPosition])
 
     const renderFooter = useCallback(() => (
-        <>
-            <MoreButton
-                onPressHandler={handleMorePress}
-                visible={more && loadingStatus !== "loading"} />
-            {loadingStatus === "loading" && <ActivityIndicator size={60} color={colors.lightblue} />}
-        </>
+        <ArchiveListFooter 
+            loadingStatus={loadingStatus}
+            more = {more}
+            onMorePress={handleMorePress}
+        />
     ), [handleMorePress, more, loadingStatus]);
 
 
     return (
         <EventListWrapper 
+            loadingStatus={loadingStatus}
             footer={renderFooter} 
+            error = {error}
             onEventSelect={handleSelectEvent} 
             events={events} 
+            initialText={
+                <>
+                    Нажмите на иконку <FontAwesome6 name="filter" color={colors.lightblue} style={{opacity: "0.3"}} size={20}/> выше, чтобы получить события
+                </>
+            }
             selectedEventItem={selectedEvent}>
 
             <BottomSheet
                 ref={bottomSheetRef}
+                enablePanDownToClose
                 index={-1}
                 snapPoints={["100%"]}
                 onChange={handleSheetChanges}>

@@ -55,6 +55,7 @@ export const eventsFetch = createAsyncThunk(
 type initialStateType = {
     content: ImageEventType[],
     loadingStatus: "loading" | "idle" | "initial",
+    error:  string | null,
     more: boolean,
     searchPosition: number,
     events: EventInformationType[],
@@ -67,7 +68,8 @@ const initialState: initialStateType = {
     loadingStatus: "initial",
     more: false,
     searchPosition: 0,
-    selectedEvent: undefined
+    selectedEvent: undefined,
+    error: null
 }
 
 const archiveSlice = createSlice({
@@ -80,6 +82,7 @@ const archiveSlice = createSlice({
         clearContent: (state) => {
             state.searchPosition = 0
             state.events = [];
+            state.error = null
         }
     },
     extraReducers: (builder) => {
@@ -103,16 +106,17 @@ const archiveSlice = createSlice({
 
             .addCase(eventsFetch.pending, (state) => {
                 state.loadingStatus = "loading"
+                state.error = null
             })
             .addCase(eventsFetch.fulfilled, (state, action) => {
                 state.more = action.payload.more;
                 state.loadingStatus = "idle";
+                state.error = action.payload.error
                 state.searchPosition = action.payload.searchPosition;
                 state.events = [...state.events, ...action.payload.res]
-                console.log(action.payload.res.length, action.payload.more, action.payload.ok);
-
+                console.log(`[Archive fetch] Получено событий: ${action.payload.res.length} Есть еще события: ${action.payload.more} Результат запроса: ${action.payload.ok}`);
             })
-            .addCase(eventsFetch.rejected, () => { })
+            .addCase(eventsFetch.rejected, () => {})
     }
 })
 

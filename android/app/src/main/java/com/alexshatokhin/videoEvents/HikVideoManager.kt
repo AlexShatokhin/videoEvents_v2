@@ -38,9 +38,6 @@ class HikVideoManager : SimpleViewManager<HikVideoView>() {
     override fun receiveCommand(view : HikVideoView, commandId: String, args: ReadableArray?){
 
         when (commandId){
-            "play" -> {
-                Log.i("HikDebug", "PLAY")
-            }
             "continue" -> {
                 view.continuePlay()
             }
@@ -50,7 +47,7 @@ class HikVideoManager : SimpleViewManager<HikVideoView>() {
             "download" -> {
                 view.download()
             }
-            "getVideo" -> {
+            "playVideo" -> {
                 val channel = args?.getInt(0)
                 val timeFrom = args?.getString(1)
                 val timeTo = args?.getString(2)

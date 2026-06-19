@@ -29,7 +29,6 @@ import java.nio.ByteOrder
 import com.hikvision.netsdk.*
 import java.util.*
 
-// 1. Меняем наследование на TextureView и реализуем TextureView.SurfaceTextureListener
 class HikVideoView(context: Context) : TextureView(context), TextureView.SurfaceTextureListener {
 
     private var fileName : String = "ch01_00000200372000100"
@@ -45,14 +44,11 @@ class HikVideoView(context: Context) : TextureView(context), TextureView.Surface
 
     private var channel = 2
 
-    // Храним ссылку на созданный Surface
+    // Surface link
     private var mSurface: Surface? = null
 
     init {
-        // 2. Настраиваем слушатель жизненного цикла текстуры
         surfaceTextureListener = this
-
-        // setZOrderOnTop(true) БОЛЬШЕ НЕ НУЖЕН! TextureView управляется через стандартный UI/ZIndex в RN
     }
 
     fun setLogId(logId: Int) {
@@ -85,7 +81,6 @@ class HikVideoView(context: Context) : TextureView(context), TextureView.Surface
     }
 
     fun startPlaybackByTime(channel: Int, startTimeString: String, endTimeString: String) {
-        // Проверяем, что Surface создан и готов к работе
         if (mSurface == null || !mSurface!!.isValid) {
             Log.e("HikDebug", "Ошибка: Surface не готов для воспроизведения")
             return
@@ -122,7 +117,7 @@ class HikVideoView(context: Context) : TextureView(context), TextureView.Surface
                 struEndTime = timeStop
                 byStreamType = 1.toByte()
                 struIDInfo.dwChannel = channel
-                hWnd = mSurface // 3. Передаем наш сохраненный mSurface
+                hWnd = mSurface
             }
 
             if (playbackId != -1) {
@@ -145,7 +140,7 @@ class HikVideoView(context: Context) : TextureView(context), TextureView.Surface
         }
     }
 
-    // 4. Обновленный метод старта по имени (теперь принимает чистый Surface, а не Holder)
+
     fun startPlay(logId: Int, fileName: String, surface: Surface){
         Log.d("HikDebug", "Surface valid: ${surface.isValid}")
 

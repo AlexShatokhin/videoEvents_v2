@@ -189,7 +189,7 @@ export default function Video() {
 		setCurrentPosition(rangeStartTs);
 		
 		dispatch(setActiveVideoName((range as any).name));
-		sendCommand('getVideo', [convertCameraDirectionToNum(), formatDisplayTime(rangeStartTs), formatDisplayTime(rangeEndTs)]);
+		sendCommand('playVideo', [convertCameraDirectionToNum(), formatDisplayTime(rangeStartTs), formatDisplayTime(rangeEndTs)]);
 	};
 
 	const displayedRanges = useMemo(() => {

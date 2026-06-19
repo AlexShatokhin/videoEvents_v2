@@ -43,6 +43,8 @@ class HikVideoView(context: Context) : TextureView(context), TextureView.Surface
     private var downloadProgress = 0
 
     private var channel = 2
+    private var startTime = "";
+    private var endTime = "";
 
     // Surface link
     private var mSurface: Surface? = null
@@ -126,13 +128,15 @@ class HikVideoView(context: Context) : TextureView(context), TextureView.Surface
             }
 
             playbackId = SDKGuider.g_sdkGuider.m_comPBGuider.PlayBackByTime_v40_jni(deviceInfo.m_lUserID, vodParam)
-            this.channel = channel
 
             if (playbackId < 0) {
                 val error = SDKGuider.g_sdkGuider.GetLastError_jni()
                 Log.e("HikDebug", "Ошибка PlayBackByTime: $error")
             } else {
                 Log.d("HikDebug", "Воспроизведение по времени запущено успешно, ID: $playbackId")
+                this.channel = channel
+                this.startTime = startTimeString
+                this.endTime = endTimeString
             }
 
         } catch (e: Exception) {
@@ -191,6 +195,9 @@ class HikVideoView(context: Context) : TextureView(context), TextureView.Surface
             if(result){
                 Log.i("HikDebug","Запись остановлена")
                 playbackId = -1
+                this.startTime = ""
+                this.endTime = ""
+                this.channel = -1
             } else {
                 Log.e("HikDebug","Ошибка остановки " + SDKGuider.g_sdkGuider.GetLastError_jni())
             }
@@ -205,6 +212,11 @@ class HikVideoView(context: Context) : TextureView(context), TextureView.Surface
 
     fun download(){
         Log.i("HikDebug", "Скачивание")
+        if(this.startTime == "" || this.endTime == "" || this.channel == -1){
+            Log.e("HikDebug", "Ошибка скачивания, параметры записи не найдены")
+            return
+        }
+
         if(downloadHandle != -1){
             downloadLock.withLock {
                 SDKGuider.g_sdkGuider.m_comPBGuider.StopGetFile_jni(downloadHandle);
@@ -212,15 +224,13 @@ class HikVideoView(context: Context) : TextureView(context), TextureView.Surface
             }
         }
 
-        val startTimeString = "2026-04-07 8:50:00"
-        val endTimeString = "2026-04-07 9:30:00"
 
         val timeStart = NET_DVR_TIME()
         val timeStop = NET_DVR_TIME()
         val sdf = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.CHINA)
         try {
-            val startDoc = sdf.parse(startTimeString)
-            val endDoc = sdf.parse(endTimeString)
+            val startDoc = sdf.parse(this.startTime)
+            val endDoc = sdf.parse(this.endTime)
 
             if (startDoc == null || endDoc == null) {
                 Log.e("HikDebug", "Ошибка: не удалось распарсить даты для скачивания")
@@ -240,7 +250,7 @@ class HikVideoView(context: Context) : TextureView(context), TextureView.Surface
 
             val date = SimpleDateFormat("yyyyMMddhhssmm").format(Date())
             val strFileName = "lustra_" + date
-            downloadHandle = SDKGuider.g_sdkGuider.m_comPBGuider.GetFileByTime_jni(mLogId, channel, timeStart, timeStop, "/mnt/sdcard/download/"+strFileName+".mp4")
+            downloadHandle = SDKGuider.g_sdkGuider.m_comPBGuider.GetFileByTime_jni(mLogId, this.channel, timeStart, timeStop, "/mnt/sdcard/download/"+strFileName+".mp4")
 
             if(downloadHandle == -1){
                 Log.e("HikDebug", "Ошибка скачивания")

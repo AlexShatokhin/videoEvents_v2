@@ -59,8 +59,8 @@ const GeneralButtonsBlock: FC<GeneralButtonsBlockPropsType> = ({ navigation, sho
             {showVideo && (
                 <MenuButton
                     navigation={navigation}
-                    navigationPath="HikvisionLogin"
-                    onPress={handleVideoPress}
+                    navigationPath="VideoPage"
+                    // onPress={handleVideoPress}
                     children={<FontAwesome name="video-camera" size={37} color={theme === "dark" ? colors.white : colors.black} />} />
             )}
 

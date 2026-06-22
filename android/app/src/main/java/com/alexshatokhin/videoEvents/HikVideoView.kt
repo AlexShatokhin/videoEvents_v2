@@ -137,6 +137,7 @@ class HikVideoView(context: Context) : TextureView(context), TextureView.Surface
                 this.channel = channel
                 this.startTime = startTimeString
                 this.endTime = endTimeString
+                startTimer()
             }
 
         } catch (e: Exception) {
@@ -198,6 +199,7 @@ class HikVideoView(context: Context) : TextureView(context), TextureView.Surface
                 this.startTime = ""
                 this.endTime = ""
                 this.channel = -1
+                stopTimer()
             } else {
                 Log.e("HikDebug","Ошибка остановки " + SDKGuider.g_sdkGuider.GetLastError_jni())
             }
@@ -206,8 +208,9 @@ class HikVideoView(context: Context) : TextureView(context), TextureView.Surface
 
     fun seekTo(time : String, stopTime: String){
         Log.i("HikDebug", "Перемотка на $time до $stopTime")
+        val savedChannel = channel
         stopPlay()
-        startPlaybackByTime(channel, time, stopTime)
+        startPlaybackByTime(savedChannel, time, stopTime)
     }
 
     fun download(){
@@ -221,6 +224,7 @@ class HikVideoView(context: Context) : TextureView(context), TextureView.Surface
             downloadLock.withLock {
                 SDKGuider.g_sdkGuider.m_comPBGuider.StopGetFile_jni(downloadHandle);
                 downloadHandle = -1;
+                return;
             }
         }
 
@@ -249,7 +253,7 @@ class HikVideoView(context: Context) : TextureView(context), TextureView.Surface
             SDKGuider.g_sdkGuider.m_comPBGuider.ConvertToTime(timeStop, calEnd)
 
             val date = SimpleDateFormat("yyyyMMddhhssmm").format(Date())
-            val strFileName = "lustra_" + date
+            val strFileName = "SMART-PATROL_" + date
             downloadHandle = SDKGuider.g_sdkGuider.m_comPBGuider.GetFileByTime_jni(mLogId, this.channel, timeStart, timeStop, "/mnt/sdcard/download/"+strFileName+".mp4")
 
             if(downloadHandle == -1){
@@ -267,7 +271,7 @@ class HikVideoView(context: Context) : TextureView(context), TextureView.Surface
         playbackLock.withLock {
             if (playbackId == -1) return
             progress = SDKGuider.g_sdkGuider.m_comPBGuider.GetPlayBackPos_jni(playbackId)
-
+            Log.i("HikDebug", "Прогресс: ${progress}")
             if(progress < 0) return
 
             val event = Arguments.createMap()
@@ -296,6 +300,7 @@ class HikVideoView(context: Context) : TextureView(context), TextureView.Surface
             if(downloadProgress == 100){
                 SDKGuider.g_sdkGuider.m_comPBGuider.StopGetFile_jni(downloadHandle);
                 Log.i("HikDebug", "Скачивание завершено успешно!")
+                downloadHandle = -1
             }
         }
     }

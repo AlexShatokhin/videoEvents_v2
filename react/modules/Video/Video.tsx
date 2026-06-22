@@ -13,7 +13,7 @@ import { RecordRange } from './types/RecordRange';
 import { RecordedRangeCard } from './components/RecordedRangeCard';
 import { setActiveVideoName, setVideos } from './slice/videoSlice';
 
-const URL = require("../../../assets/video_1.mp4")
+const URL = require("../../../assets/video.mp4")
 
 export default function VideoScreen() {
 	const { isFilterOpen, videos, activeVideoName } =
@@ -123,7 +123,7 @@ export default function VideoScreen() {
 			<View style={styles.playerColumn}>
 				<Video
 					ref={videoRef}
-					source={{ uri: activeVideoName !== null ? URL : "" }}
+					source={activeVideoName !== null ? URL : "" }
 					style={styles.videoView}
 					paused={!isPlaying}
 					onLoad={handleLoad}

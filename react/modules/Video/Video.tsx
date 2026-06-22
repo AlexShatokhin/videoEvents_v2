@@ -1,55 +1,40 @@
-import { requireNativeComponent, StyleSheet, Text, View, LayoutAnimation, Platform } from 'react-native'
+import { LayoutAnimation, Platform, StyleSheet, Text, View } from 'react-native'
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Slider from '@react-native-community/slider';
+import Video, { OnProgressData, OnLoadData } from 'react-native-video';
 import { colors } from '../../../constants/colors';
 import { PlayerActionButton } from './components/PlayerActionButton';
-import { useTypedDispatch, useTypedSelector } from '../../hooks/useRedux';
+import { formatTime } from './utils/date';
+import { ScrollView } from 'react-native-gesture-handler';
 import BottomSheet, { BottomSheetView } from '@gorhom/bottom-sheet';
 import VideoFilter from './components/VideoFilter';
+import { useTypedDispatch, useTypedSelector } from '../../hooks/useRedux';
+import { RecordRange } from './types/RecordRange';
 import { RecordedRangeCard } from './components/RecordedRangeCard';
-import { setVideos, setActiveVideoName } from './slice/videoSlice';
-import { ScrollView } from 'react-native-gesture-handler';
-import { useVideoPlayer, PlayerStatus } from './hooks/useVideoPlayer';
-import { formatDisplayTime, formatTime } from './utils/date';
-import type { RecordRange } from './types/RecordRange';
+import { setActiveVideoName, setVideos } from './slice/videoSlice';
 
-const HikVideoView = requireNativeComponent("HikVideoView");
+const URL = require("../../../assets/video_1.mp4")
 
-export default function Video() {
-	const { isFilterOpen, date, timeFrom, timeTo, videos, activeVideoName, cameraDirection } =
+export default function VideoScreen() {
+	const { isFilterOpen, videos, activeVideoName } =
 		useTypedSelector(state => state.videoReducer);
-	const dispatch = useTypedDispatch();
-
 	const bottomSheetRef = useRef<BottomSheet>(null);
-	const handleVideosLoaded = useCallback((files: RecordRange[]) => {
-		dispatch(setVideos(files));
-	}, [dispatch]);
+	const dispatch = useTypedDispatch()
 
-	const handleActiveVideoChange = useCallback((name: string) => {
-		dispatch(setActiveVideoName(name));
-	}, [dispatch]);
+	const videoRef = useRef<any>(null);
 
-	const {
-		videoPlayerRef,
-		logId,
-		status,
-		currentPosition,
-		startTime,
-		endTime,
-		pause,
-		resume,
-		play,
-		download,
-		onProgress,
-		seekTo,
-		playRange,
-		loadRange,
-		setCurrentPosition
-	} = useVideoPlayer({
-		cameraDirection,
-		onVideosLoaded: handleVideosLoaded,
-		onActiveVideoChange: handleActiveVideoChange,
-	});
+	const [isPlaying, setIsPlaying] = useState(false);
+	const [duration, setDuration] = useState(0);
+	const [currentTime, setCurrentTime] = useState(0);
+	const [isSeeking, setIsSeeking] = useState(false);
+	const [seekValue, setSeekValue] = useState(0);
+
+	const displayPosition = isSeeking ? seekValue : currentTime;
+	const sliderValue = duration > 0 ? (displayPosition / duration) * 100 : 0;
+
+	const displayedRanges = useMemo<RecordRange[]>(() => {
+		return videos && videos.length > 0 ? (videos as RecordRange[]) : [];
+	}, [videos]);
 
 	useEffect(() => {
 		if (isFilterOpen) {
@@ -59,80 +44,101 @@ export default function Video() {
 		}
 	}, [isFilterOpen]);
 
+	const loadRange = () => {
+		const testData = [
+			{
+				startTime: "22-06-2026T08:50:00",
+				endTime: "22-06-2026T09:50:00",
+				size: 202929,
+				name: "ch_2020202"				
+			},
+			{
+				startTime: "22-06-2026T08:50:00",
+				endTime: "22-06-2026T08:55:00",
+				size: 202929,
+				name: "ch_212020202"
+			},
+			{
+				startTime: "22-06-2026T08:50:00",
+				endTime: "22-06-2026T10:20:00",
+				size: 202929,
+				name: "ch_202022202"
+			},			
+		]
+		dispatch(setVideos(testData))
+	}
+
 	const handleApplyFilter = useCallback(() => {
-		loadRange(date, timeFrom, timeTo);
-	}, [date, timeFrom, timeTo, loadRange]);
+		loadRange();
+	}, [loadRange]);
 
 	const handleRangeCardPress = useCallback((range: RecordRange) => {
 		if (Platform.OS === 'android') {
 			LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
 		}
-		playRange(range);
-	}, [playRange]);
+		setIsPlaying(true)
+		dispatch(setActiveVideoName(range.name))
+	}, []);
+
+
+	const handlePlayPause = useCallback(() => {
+		setIsPlaying((prev) => !prev);
+	}, []);
+
+	const handleLoad = useCallback((data: OnLoadData) => {
+		setDuration(data.duration);
+	}, []);
+
+	const handleProgress = useCallback((data: OnProgressData) => {
+		if (!isSeeking) {
+			setCurrentTime(data.currentTime);
+		}
+	}, [isSeeking]);
+
+	const handleSliderDragging = useCallback((value: number) => {
+		setIsSeeking(true);
+		setSeekValue((value / 100) * duration);
+	}, [duration]);
+
+	const handleSliderComplete = useCallback((value: number) => {
+		const time = (value / 100) * duration;
+		videoRef.current?.seek(time);
+		setCurrentTime(time);
+		setIsSeeking(false);
+	}, [duration]);
 
 	const handleSheetChanges = useCallback((index: number) => {
 		if (index === 0) {
 			bottomSheetRef.current?.snapToIndex(0);
 		}
-	}, []);
+	}, []);	
 
-	const displayedRanges = useMemo<RecordRange[]>(() => {
-		return videos && videos.length > 0 ? (videos as RecordRange[]) : [];
-	}, [videos]);
+	const activeButton = isPlaying
+		? <PlayerActionButton size={38} type="pause" onPress={handlePlayPause} />
+		: <PlayerActionButton size={38} type="play" onPress={handlePlayPause} />;
 
-	const displayPosition = currentPosition;
-
-	const sliderValue = () => {
-		const duration = endTime - startTime;
-		return duration > 0 ? ((displayPosition - startTime) / duration) * 100 : 0;
-	};
-
-	const sliderValueToTime = useCallback((value: number) => {
-		return startTime + (value / 100) * (endTime - startTime);
-	}, [startTime, endTime]);
-
-	const handleSliderDragging = useCallback((value: number) => {
-		//setDraggingPosition(sliderValueToTime(value));
-		setCurrentPosition(sliderValueToTime(value))
-	}, [sliderValueToTime]);
-
-	const handleSliderComplete = useCallback((value: number) => {
-		seekTo(sliderValueToTime(value), endTime);
-		setCurrentPosition(value)
-	}, [sliderValueToTime, seekTo, endTime]);
-
-
-	const activeButton = useMemo(() => {
-		switch (status) {
-			case PlayerStatus.PLAYING:
-				return <PlayerActionButton size={38} type="pause" onPress={pause} />;
-			case PlayerStatus.PAUSED:
-				return <PlayerActionButton size={38} type="play" onPress={resume} />;
-			case PlayerStatus.STOPPED:
-				return <PlayerActionButton size={38} type="play" onPress={play} />;
-			default:
-				return <Text>Неизвестный статус проигрывания</Text>;
-		}
-	}, [status, pause, resume, play]);
 
 	return (
 		<View style={styles.container}>
 			<View style={styles.playerColumn}>
-				<HikVideoView
-					ref={videoPlayerRef}
+				<Video
+					ref={videoRef}
+					source={{ uri: activeVideoName !== null ? URL : "" }}
 					style={styles.videoView}
-					fileName={activeVideoName}
-					logId={logId}
-					onProgress={onProgress}
+					paused={!isPlaying}
+					onLoad={handleLoad}
+					onProgress={handleProgress}
+					progressUpdateInterval={250}
+					resizeMode="contain"
 				/>
 				<View style={styles.controlsWrapper}>
 					<View style={[styles.playerContainer, styles.sliderRow]}>
 					{<Slider
-							style={[styles.slider, {opacity: isFilterOpen ? 0 : 1}]}
+							style={styles.slider}
 							step={0.1}
 							minimumValue={0}
 							maximumValue={100}
-							value={sliderValue()}
+							value={sliderValue}
 							onValueChange={handleSliderDragging}
 							onSlidingComplete={handleSliderComplete}
 							minimumTrackTintColor={colors.lightblue}
@@ -145,13 +151,13 @@ export default function Video() {
 						<View style={[styles.playerContainer, styles.buttonsGroup]}>
 							<View style={styles.buttonsRow}>
 								{activeButton}
-								<PlayerActionButton type="download" onPress={download} />
+								{/* <PlayerActionButton type="download" onPress={download} /> */}
 							</View>
 						</View>
 						<View style={styles.playerTimeContainer}>
 							<Text style={styles.playerTimeText}>{formatTime(displayPosition)}</Text>
 							<Text style={styles.playerTimeText}> / </Text>
-							<Text style={styles.playerTimeText}>{formatTime(endTime)}</Text>
+							<Text style={styles.playerTimeText}>{formatTime(duration)}</Text>
 						</View>
 					</View>
 				</View>
@@ -185,6 +191,7 @@ export default function Video() {
 			</BottomSheet>
 		</View>
 	);
+
 }
 
 const styles = StyleSheet.create({
@@ -234,14 +241,6 @@ const styles = StyleSheet.create({
 		justifyContent: 'flex-start',
 		alignItems: 'flex-start',
 	},
-	listWrapper: {
-		width: "30%",
-		height: "100%",
-		backgroundColor: 'rgba(20, 20, 25, 0.4)',
-		borderLeftWidth: 1,
-		borderLeftColor: 'rgba(255, 255, 255, 0.1)',
-		paddingTop: 10,
-	},
 	playerTimeContainer: {
 		flexDirection: 'row',
 		justifyContent: 'center',
@@ -251,6 +250,11 @@ const styles = StyleSheet.create({
 		color: colors.white,
 		fontSize: 16,
 	},
+	scrollContent: {
+		paddingHorizontal: 10,
+		paddingBottom: 20,
+		gap: 8,
+	},	
 	contentContainer: {
 		flex: 1,
 		padding: 36,
@@ -270,9 +274,12 @@ const styles = StyleSheet.create({
 		marginBottom: 15,
 		opacity: 0.9,
 	},
-	scrollContent: {
-		paddingHorizontal: 10,
-		paddingBottom: 20,
-		gap: 8,
-	},
+	listWrapper: {
+		width: "30%",
+		height: "100%",
+		backgroundColor: 'rgba(20, 20, 25, 0.4)',
+		borderLeftWidth: 1,
+		borderLeftColor: 'rgba(255, 255, 255, 0.1)',
+		paddingTop: 10,
+	},		
 });

@@ -55,7 +55,7 @@ export const useConnectionCheck = () => {
         };
 
         const interval = setInterval(() => {
-            process.env.NODE_ENV === "production" ? performConnectionCheck() : null;
+            process.env.NODE_ENV === "production" ? null  : null; // performConnectionCheck()
         }, 10000); // Проверка каждые 15 секунд
 
         // // Выполняем первую проверку сразу

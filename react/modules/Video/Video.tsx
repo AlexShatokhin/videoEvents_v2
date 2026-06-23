@@ -1,5 +1,5 @@
-import { ActivityIndicator, LayoutAnimation, Platform, StyleSheet, Text, TouchableWithoutFeedback, View } from 'react-native'
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { ActivityIndicator, LayoutAnimation, Platform, StyleSheet, Text, View } from 'react-native';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Slider from '@react-native-community/slider';
 import Video, { OnProgressData, OnLoadData } from 'react-native-video';
 import { colors } from '../../../constants/colors';
@@ -13,13 +13,13 @@ import { RecordRange } from './types/RecordRange';
 import { RecordedRangeCard } from './components/RecordedRangeCard';
 import { setActiveVideoName, setVideos, toggleFilterVisibility } from './slice/videoSlice';
 
-const URL = require("../../../assets/video.mp4")
+const URL_FILE = require("../../../assets/video.mp4");
 
 export default function VideoScreen() {
 	const { isFilterOpen, videos, activeVideoName } =
 		useTypedSelector(state => state.videoReducer);
 	const bottomSheetRef = useRef<BottomSheet>(null);
-	const dispatch = useTypedDispatch()
+	const dispatch = useTypedDispatch();
 
 	const videoRef = useRef<any>(null);
 
@@ -31,6 +31,29 @@ export default function VideoScreen() {
 	const [isFullscreen, setIsFullscreen] = useState(false);
 	const [isVideoLoading, setIsVideoLoading] = useState(false);
 	const hideControlsTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+	useEffect(() => {
+		let interval: ReturnType<typeof setInterval> | null = null;
+
+		if (isPlaying && !isSeeking) {
+			interval = setInterval(() => {
+				setCurrentTime((prevTime) => {
+
+					if (prevTime >= duration && duration > 0) {
+						setIsPlaying(false);
+						if (interval) clearInterval(interval);
+						return duration;
+					}
+
+					return prevTime + 1;
+				});
+			}, 1000);
+		}
+
+		return () => {
+			if (interval) clearInterval(interval);
+		};
+	}, [isPlaying, isSeeking, duration]);
 
 	const displayPosition = isSeeking ? seekValue : currentTime;
 	const sliderValue = duration > 0 ? (displayPosition / duration) * 100 : 0;
@@ -75,24 +98,24 @@ export default function VideoScreen() {
 				size: 202929,
 				name: "ch_202022202"
 			},			
-		]
-		dispatch(setVideos(testData))
-	}
+		];
+		dispatch(setVideos(testData));
+	};
 
 	const handleApplyFilter = useCallback(() => {
 		loadRange();
-		dispatch(toggleFilterVisibility())
-	}, [loadRange]);
+		dispatch(toggleFilterVisibility());
+	}, [dispatch]);
 
 	const handleRangeCardPress = useCallback((range: RecordRange) => {
 		if (Platform.OS === 'android') {
 			LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
 		}
 		setIsVideoLoading(true);
-		setIsPlaying(true)
-		dispatch(setActiveVideoName(range.name))
-	}, []);
-
+		setIsPlaying(true);
+		setCurrentTime(0);
+		dispatch(setActiveVideoName(range.name));
+	}, [dispatch]);
 
 	const setFullscreen = useCallback((value: boolean) => {
 		if (Platform.OS === 'android') {
@@ -105,11 +128,9 @@ export default function VideoScreen() {
 		setFullscreen(!isFullscreen);
 	}, [isFullscreen, setFullscreen]);
 
-
 	const handlePlayPause = useCallback(() => {
 		setIsPlaying((prev) => !prev);
-
-	}, [isFullscreen]);
+	}, []);
 
 	const handleLoad = useCallback((data: OnLoadData) => {
 		setDuration(data.duration);
@@ -120,19 +141,11 @@ export default function VideoScreen() {
 		setIsVideoLoading(false);
 	}, []);
 
-	const handleProgress = useCallback((data: OnProgressData) => {
-		if (!isSeeking) {
-			setCurrentTime(data.currentTime);
-		}
-	}, [isSeeking]);
-
 	const handleSliderDragging = useCallback((value: number) => {
 		setIsSeeking(true);
 		setSeekValue((value / 100) * duration);
-		if (isFullscreen) {
-			if (hideControlsTimeoutRef.current) {
-				clearTimeout(hideControlsTimeoutRef.current);
-			}
+		if (isFullscreen && hideControlsTimeoutRef.current) {
+			clearTimeout(hideControlsTimeoutRef.current);
 		}
 	}, [duration, isFullscreen]);
 
@@ -141,8 +154,7 @@ export default function VideoScreen() {
 		videoRef.current?.seek(time);
 		setCurrentTime(time);
 		setIsSeeking(false);
-
-	}, [duration, isFullscreen]);
+	}, [duration]);
 
 	const handleSheetChanges = useCallback((index: number) => {
 		if (index === 0) {
@@ -165,8 +177,9 @@ export default function VideoScreen() {
 	const controlsContent = (
 		<>
 			<View style={[styles.playerContainer, styles.sliderRow]}>
-				{!isFilterOpen && <Slider
-					style={styles.slider}
+				
+				<Slider
+					style={[styles.slider, isFilterOpen ? {opacity: 0, pointerEvents: "none"} : null]}
 					step={0.1}
 					minimumValue={0}
 					maximumValue={100}
@@ -176,14 +189,14 @@ export default function VideoScreen() {
 					minimumTrackTintColor={colors.lightblue}
 					maximumTrackTintColor={colors.deepblue}
 					thumbTintColor={colors.lightblue}
-				/>}
+				/>
+				
 			</View>
 
 			<View style={styles.controlsRow}>
 				<View style={[styles.playerContainer, styles.buttonsGroup]}>
 					<View style={styles.buttonsRow}>
 						{activeButton}
-						{/* <PlayerActionButton type="download" onPress={download} /> */}
 						<View style={styles.playerTimeContainer}>
 							<Text style={styles.playerTimeText}>{formatTime(displayPosition)}</Text>
 							<Text style={styles.playerTimeText}> / </Text>
@@ -203,17 +216,22 @@ export default function VideoScreen() {
 		<View style={styles.container}>
 			<View style={isFullscreen ? styles.fullscreenWrapper : styles.playerColumn}>
 				<View style={isFullscreen ? styles.fullscreenVideoTouchArea : styles.playerVideoArea}>
-					<Video
-						ref={videoRef}
-						source={activeVideoName !== null ? URL : "" }
-						style={isFullscreen ? styles.videoViewFullscreen : styles.videoView}
-						paused={!isPlaying}
-						onLoad={handleLoad}
-						onProgress={handleProgress}
-						onError={handleVideoError}
-						progressUpdateInterval={250}
-						resizeMode="contain"
-					/>
+					{activeVideoName !== null ? (
+						<Video
+							ref={videoRef}
+							source={URL_FILE}
+							style={isFullscreen ? styles.videoViewFullscreen : styles.videoView}
+							paused={!isPlaying}
+							onLoad={handleLoad}
+							onError={handleVideoError}
+							progressUpdateInterval={1000}
+							resizeMode="contain"
+						/>
+					) : (
+						<View style={[styles.videoView, { justifyContent: 'center', alignItems: 'center' }]}>
+							<Text style={{ color: colors.white }}>Выберите запись для воспроизведения</Text>
+						</View>
+					)}
 					{activeVideoName !== null && isVideoLoading && (
 						<View style={styles.loadingOverlay}>
 							<ActivityIndicator size="large" color={colors.lightblue} />
@@ -234,16 +252,18 @@ export default function VideoScreen() {
 						showsHorizontalScrollIndicator={false}
 						contentContainerStyle={styles.scrollContent}
 					>
-						{displayedRanges.length === 0 ? 
-						<Text>Записей пока нет...</Text>
-						: displayedRanges.map((range) => (
-							<RecordedRangeCard
-								key={range.name}
-								range={range}
-								isActive={activeVideoName === range.name}
-								onPress={handleRangeCardPress}
-							/>
-						))}
+						{displayedRanges.length === 0 ? (
+							<Text style={{ color: colors.white }}>Записей пока нет...</Text>
+						) : (
+							displayedRanges.map((range) => (
+								<RecordedRangeCard
+									key={range.name}
+									range={range}
+									isActive={activeVideoName === range.name}
+									onPress={handleRangeCardPress}
+								/>
+							))
+						)}
 					</ScrollView>
 				</View>
 			)}
@@ -260,7 +280,6 @@ export default function VideoScreen() {
 			</BottomSheet>
 		</View>
 	);
-
 }
 
 const styles = StyleSheet.create({

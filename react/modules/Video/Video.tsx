@@ -1,4 +1,4 @@
-import { LayoutAnimation, Platform, StyleSheet, Text, View } from 'react-native'
+import { ActivityIndicator, LayoutAnimation, Platform, StyleSheet, Text, TouchableWithoutFeedback, View } from 'react-native'
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Slider from '@react-native-community/slider';
 import Video, { OnProgressData, OnLoadData } from 'react-native-video';
@@ -11,7 +11,7 @@ import VideoFilter from './components/VideoFilter';
 import { useTypedDispatch, useTypedSelector } from '../../hooks/useRedux';
 import { RecordRange } from './types/RecordRange';
 import { RecordedRangeCard } from './components/RecordedRangeCard';
-import { setActiveVideoName, setVideos } from './slice/videoSlice';
+import { setActiveVideoName, setVideos, toggleFilterVisibility } from './slice/videoSlice';
 
 const URL = require("../../../assets/video.mp4")
 
@@ -28,6 +28,9 @@ export default function VideoScreen() {
 	const [currentTime, setCurrentTime] = useState(0);
 	const [isSeeking, setIsSeeking] = useState(false);
 	const [seekValue, setSeekValue] = useState(0);
+	const [isFullscreen, setIsFullscreen] = useState(false);
+	const [isVideoLoading, setIsVideoLoading] = useState(false);
+	const hideControlsTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
 	const displayPosition = isSeeking ? seekValue : currentTime;
 	const sliderValue = duration > 0 ? (displayPosition / duration) * 100 : 0;
@@ -43,6 +46,14 @@ export default function VideoScreen() {
 			bottomSheetRef.current?.close();
 		}
 	}, [isFilterOpen]);
+
+	useEffect(() => {
+		return () => {
+			if (hideControlsTimeoutRef.current) {
+				clearTimeout(hideControlsTimeoutRef.current);
+			}
+		};
+	}, []);
 
 	const loadRange = () => {
 		const testData = [
@@ -70,23 +81,43 @@ export default function VideoScreen() {
 
 	const handleApplyFilter = useCallback(() => {
 		loadRange();
+		dispatch(toggleFilterVisibility())
 	}, [loadRange]);
 
 	const handleRangeCardPress = useCallback((range: RecordRange) => {
 		if (Platform.OS === 'android') {
 			LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
 		}
+		setIsVideoLoading(true);
 		setIsPlaying(true)
 		dispatch(setActiveVideoName(range.name))
 	}, []);
 
 
+	const setFullscreen = useCallback((value: boolean) => {
+		if (Platform.OS === 'android') {
+			LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+		}
+		setIsFullscreen(value);
+	}, []);
+
+	const handleToggleFullscreen = useCallback(() => {
+		setFullscreen(!isFullscreen);
+	}, [isFullscreen, setFullscreen]);
+
+
 	const handlePlayPause = useCallback(() => {
 		setIsPlaying((prev) => !prev);
-	}, []);
+
+	}, [isFullscreen]);
 
 	const handleLoad = useCallback((data: OnLoadData) => {
 		setDuration(data.duration);
+		setIsVideoLoading(false);
+	}, []);
+
+	const handleVideoError = useCallback(() => {
+		setIsVideoLoading(false);
 	}, []);
 
 	const handleProgress = useCallback((data: OnProgressData) => {
@@ -98,14 +129,20 @@ export default function VideoScreen() {
 	const handleSliderDragging = useCallback((value: number) => {
 		setIsSeeking(true);
 		setSeekValue((value / 100) * duration);
-	}, [duration]);
+		if (isFullscreen) {
+			if (hideControlsTimeoutRef.current) {
+				clearTimeout(hideControlsTimeoutRef.current);
+			}
+		}
+	}, [duration, isFullscreen]);
 
 	const handleSliderComplete = useCallback((value: number) => {
 		const time = (value / 100) * duration;
 		videoRef.current?.seek(time);
 		setCurrentTime(time);
 		setIsSeeking(false);
-	}, [duration]);
+
+	}, [duration, isFullscreen]);
 
 	const handleSheetChanges = useCallback((index: number) => {
 		if (index === 0) {
@@ -117,57 +154,89 @@ export default function VideoScreen() {
 		? <PlayerActionButton size={38} type="pause" onPress={handlePlayPause} />
 		: <PlayerActionButton size={38} type="play" onPress={handlePlayPause} />;
 
+	const fullscreenButton = (
+		<PlayerActionButton
+			size={28}
+			type={isFullscreen ? 'fullscreen-exit' : 'fullscreen'}
+			onPress={handleToggleFullscreen}
+		/>
+	);
 
-	return (
-		<View style={styles.container}>
-			<View style={styles.playerColumn}>
-				<Video
-					ref={videoRef}
-					source={activeVideoName !== null ? URL : "" }
-					style={styles.videoView}
-					paused={!isPlaying}
-					onLoad={handleLoad}
-					onProgress={handleProgress}
-					progressUpdateInterval={250}
-					resizeMode="contain"
-				/>
-				<View style={styles.controlsWrapper}>
-					<View style={[styles.playerContainer, styles.sliderRow]}>
-					{<Slider
-							style={styles.slider}
-							step={0.1}
-							minimumValue={0}
-							maximumValue={100}
-							value={sliderValue}
-							onValueChange={handleSliderDragging}
-							onSlidingComplete={handleSliderComplete}
-							minimumTrackTintColor={colors.lightblue}
-							maximumTrackTintColor={colors.deepblue}
-							thumbTintColor={colors.lightblue}
-						/>}
-					</View>
+	const controlsContent = (
+		<>
+			<View style={[styles.playerContainer, styles.sliderRow]}>
+				{!isFilterOpen && <Slider
+					style={styles.slider}
+					step={0.1}
+					minimumValue={0}
+					maximumValue={100}
+					value={sliderValue}
+					onValueChange={handleSliderDragging}
+					onSlidingComplete={handleSliderComplete}
+					minimumTrackTintColor={colors.lightblue}
+					maximumTrackTintColor={colors.deepblue}
+					thumbTintColor={colors.lightblue}
+				/>}
+			</View>
 
-					<View style={styles.controlsRow}>
-						<View style={[styles.playerContainer, styles.buttonsGroup]}>
-							<View style={styles.buttonsRow}>
-								{activeButton}
-								{/* <PlayerActionButton type="download" onPress={download} /> */}
-							</View>
-						</View>
+			<View style={styles.controlsRow}>
+				<View style={[styles.playerContainer, styles.buttonsGroup]}>
+					<View style={styles.buttonsRow}>
+						{activeButton}
+						{/* <PlayerActionButton type="download" onPress={download} /> */}
 						<View style={styles.playerTimeContainer}>
 							<Text style={styles.playerTimeText}>{formatTime(displayPosition)}</Text>
 							<Text style={styles.playerTimeText}> / </Text>
 							<Text style={styles.playerTimeText}>{formatTime(duration)}</Text>
-						</View>
+						</View>						
 					</View>
+				</View>
+
+				<View style={styles.fullscreenButtonContainer}>
+					{fullscreenButton}
+				</View>
+			</View>
+		</>
+	);
+
+	return (
+		<View style={styles.container}>
+			<View style={isFullscreen ? styles.fullscreenWrapper : styles.playerColumn}>
+				<View style={isFullscreen ? styles.fullscreenVideoTouchArea : styles.playerVideoArea}>
+					<Video
+						ref={videoRef}
+						source={activeVideoName !== null ? URL : "" }
+						style={isFullscreen ? styles.videoViewFullscreen : styles.videoView}
+						paused={!isPlaying}
+						onLoad={handleLoad}
+						onProgress={handleProgress}
+						onError={handleVideoError}
+						progressUpdateInterval={250}
+						resizeMode="contain"
+					/>
+					{activeVideoName !== null && isVideoLoading && (
+						<View style={styles.loadingOverlay}>
+							<ActivityIndicator size="large" color={colors.lightblue} />
+							<Text style={styles.loadingText}>Инициализация видео...</Text>
+						</View>
+					)}
+				</View>
+				<View style={isFullscreen ? styles.fullscreenControlsOverlay : styles.controlsWrapper}>
+					{controlsContent}
 				</View>
 			</View>
 
-			<View style={styles.listWrapper}>
-				<View style={styles.rangeCardsContainer}>
+			{!isFullscreen && (
+				<View style={styles.listWrapper}>
 					<Text style={styles.rangeCardsTitle}>ДОСТУПНЫЕ ЗАПИСИ</Text>
-					<ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
-						{displayedRanges.map((range) => (
+					<ScrollView
+						horizontal
+						showsHorizontalScrollIndicator={false}
+						contentContainerStyle={styles.scrollContent}
+					>
+						{displayedRanges.length === 0 ? 
+						<Text>Записей пока нет...</Text>
+						: displayedRanges.map((range) => (
 							<RecordedRangeCard
 								key={range.name}
 								range={range}
@@ -177,7 +246,7 @@ export default function VideoScreen() {
 						))}
 					</ScrollView>
 				</View>
-			</View>
+			)}
 
 			<BottomSheet
 				ref={bottomSheetRef}
@@ -197,18 +266,31 @@ export default function VideoScreen() {
 const styles = StyleSheet.create({
 	container: {
 		position: "relative",
-		flexDirection: "row",
-		justifyContent: "center",
-		alignItems: "center",
+		flexDirection: "column",
+		justifyContent: "flex-start",
+		alignItems: "stretch",
 		width: "100%",
 		height: "100%",
 	},
 	playerColumn: {
-		width: "70%",
+		width: "100%",
+		flex: 1,
+		justifyContent: "center",
+		position: "relative",
+		top: 0,
+		left: 0,
+		right: 0,
+		bottom: 0,
+	},
+	playerVideoArea: {
+		width: "100%",
+		height: "80%",
+		backgroundColor: colors.black,
+		position: "relative",
 	},
 	videoView: {
 		width: "100%",
-		height: 380,
+		height: "100%",
 	},
 	controlsWrapper: {
 		paddingHorizontal: 10,
@@ -223,6 +305,7 @@ const styles = StyleSheet.create({
 	controlsRow: {
 		flexDirection: "row",
 		justifyContent: "space-between",
+		alignItems: "center",
 		width: "100%",
 		paddingHorizontal: 10,
 	},
@@ -235,6 +318,10 @@ const styles = StyleSheet.create({
 		gap: 25,
 		justifyContent: "center",
 		alignItems: "center",
+	},
+	fullscreenButtonContainer: {
+		justifyContent: 'center',
+		alignItems: 'center',
 	},
 	playerContainer: {
 		flexDirection: 'row',
@@ -252,9 +339,11 @@ const styles = StyleSheet.create({
 	},
 	scrollContent: {
 		paddingHorizontal: 10,
-		paddingBottom: 20,
+		paddingVertical: 8,
+		flexDirection: "row",
+		alignItems: "center",
 		gap: 8,
-	},	
+	},
 	contentContainer: {
 		flex: 1,
 		padding: 36,
@@ -262,24 +351,67 @@ const styles = StyleSheet.create({
 		zIndex: 1000,
 		elevation: 100,
 	},
-	rangeCardsContainer: {
-		flex: 1,
-	},
 	rangeCardsTitle: {
 		color: colors.lightblue,
-		fontSize: 12,
+		fontSize: 10,
 		fontWeight: '800',
-		letterSpacing: 1.2,
-		marginLeft: 15,
-		marginBottom: 15,
+		letterSpacing: 1,
 		opacity: 0.9,
 	},
 	listWrapper: {
-		width: "30%",
+		width: "100%",
+		height: 110,
+		flexDirection: "column",
+		backgroundColor: 'rgba(20, 20, 25, 0.5)',
+		borderTopWidth: 1,
+		borderTopColor: 'rgba(255, 255, 255, 0.1)',
+		paddingTop: 6,
+		paddingLeft: 12,
+	},
+	videoViewFullscreen: {
+		width: "100%",
 		height: "100%",
-		backgroundColor: 'rgba(20, 20, 25, 0.4)',
-		borderLeftWidth: 1,
-		borderLeftColor: 'rgba(255, 255, 255, 0.1)',
-		paddingTop: 10,
-	},		
+	},
+	fullscreenWrapper: {
+		position: "absolute",
+		top: 0,
+		left: 0,
+		right: 0,
+		bottom: 0,
+		width: "100%",
+		height: "100%",
+		backgroundColor: '#000',
+		zIndex: 999,
+		elevation: 999,
+	},
+	fullscreenVideoTouchArea: {
+		width: "100%",
+		height: "100%",
+		position: "relative",
+	},
+	fullscreenControlsOverlay: {
+		position: "absolute",
+		left: 0,
+		right: 0,
+		bottom: 0,
+		paddingTop: 16,
+		paddingBottom: 12,
+		paddingHorizontal: 10,
+		backgroundColor: 'rgba(0, 0, 0, 0.55)',
+	},
+	loadingOverlay: {
+		position: "absolute",
+		top: 0,
+		left: 0,
+		right: 0,
+		bottom: 0,
+		justifyContent: "center",
+		alignItems: "center",
+		backgroundColor: 'rgba(0, 0, 0, 0.45)',
+		gap: 10,
+	},
+	loadingText: {
+		color: colors.white,
+		fontSize: 14,
+	},
 });

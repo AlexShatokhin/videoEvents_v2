@@ -1,10 +1,10 @@
-import { Entypo } from "@expo/vector-icons";
+import { Entypo, AntDesign } from "@expo/vector-icons";
 import { colors } from "../../../../constants/colors";
 import React from "react";
 import { TouchableOpacity } from "react-native";
 
 type PlayerActionButtonProps = {
-    type: 'play' | 'pause' | 'stop' | "fast-forward" | "fast-backward" | "download";
+    type: 'play' | 'pause' | 'stop' | "fast-forward" | "fast-backward" | "download" | "fullscreen" | "fullscreen-exit";
     onPress: () => void;
     size?: number;
     color?: string;
@@ -12,6 +12,14 @@ type PlayerActionButtonProps = {
 
 export const PlayerActionButton = ({ type, onPress, size, color }: PlayerActionButtonProps) => {
     
+    if(type === "fullscreen" || type === "fullscreen-exit"){
+        return (
+        <TouchableOpacity onPress={onPress}>
+            <AntDesign name={type} size={size || 28} color={color || colors.white} />
+        </TouchableOpacity>
+    )
+    }
+
     const getIconByType = () => {
         switch (type) {
             case "play": return "controller-play";

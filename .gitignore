@@ -77,3 +77,5 @@ output.json
 codegen-generated
 
 .env
+
+*.mp4

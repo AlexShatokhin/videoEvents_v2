@@ -15,13 +15,32 @@ import { setActiveVideoName, setVideos, toggleFilterVisibility } from './slice/v
 
 const URL_FILE = require("../../../assets/video.mp4");
 
+type Theme = "dark" | "light";
+
+const getThemeColors = (theme: Theme) => ({
+	background: theme === "dark" ? colors.black : colors.white,
+	surface: theme === "dark" ? colors.black : colors.white,
+	text: theme === "dark" ? colors.white : colors.black,
+	textSecondary: theme === "dark" ? colors.white : colors.deepblue,
+	accent: colors.lightblue,
+	track: theme === "dark" ? colors.deepblue : colors.lightblue,
+	border: theme === "dark" ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.1)',
+	listBackground: theme === "dark" ? 'rgba(20, 20, 25, 0.5)' : 'rgba(230, 230, 235, 0.6)',
+	loadingOverlay: theme === "dark" ? 'rgba(0, 0, 0, 0.45)' : 'rgba(255, 255, 255, 0.55)',
+	fullscreenControlsOverlay: theme === "dark" ? 'rgba(0, 0, 0, 0.55)' : 'rgba(255, 255, 255, 0.7)',
+	fullscreenBackground: theme === "dark" ? '#000' : '#fff',
+});
+
 export default function VideoScreen() {
 	const { isFilterOpen, videos, activeVideoName } =
 		useTypedSelector(state => state.videoReducer);
+	const theme = useTypedSelector(state => state.settingsReducer.theme) as Theme;
 	const bottomSheetRef = useRef<BottomSheet>(null);
 	const dispatch = useTypedDispatch();
 
 	const videoRef = useRef<any>(null);
+	const themeColors = useMemo(() => getThemeColors(theme), [theme]);
+	const styles = useMemo(() => createStyles(themeColors), [themeColors]);
 
 	const [isPlaying, setIsPlaying] = useState(false);
 	const [duration, setDuration] = useState(0);
@@ -163,11 +182,12 @@ export default function VideoScreen() {
 	}, []);	
 
 	const activeButton = isPlaying
-		? <PlayerActionButton size={38} type="pause" onPress={handlePlayPause} />
-		: <PlayerActionButton size={38} type="play" onPress={handlePlayPause} />;
+		? <PlayerActionButton color={themeColors.text} size={38} type="pause" onPress={handlePlayPause} />
+		: <PlayerActionButton color={themeColors.text} size={38} type="play" onPress={handlePlayPause} />;
 
 	const fullscreenButton = (
 		<PlayerActionButton
+			color={themeColors.text}
 			size={28}
 			type={isFullscreen ? 'fullscreen-exit' : 'fullscreen'}
 			onPress={handleToggleFullscreen}
@@ -186,9 +206,9 @@ export default function VideoScreen() {
 					value={sliderValue}
 					onValueChange={handleSliderDragging}
 					onSlidingComplete={handleSliderComplete}
-					minimumTrackTintColor={colors.lightblue}
-					maximumTrackTintColor={colors.deepblue}
-					thumbTintColor={colors.lightblue}
+					minimumTrackTintColor={themeColors.accent}
+					maximumTrackTintColor={themeColors.track}
+					thumbTintColor={themeColors.accent}
 				/>
 				
 			</View>
@@ -229,12 +249,12 @@ export default function VideoScreen() {
 						/>
 					) : (
 						<View style={[styles.videoView, { justifyContent: 'center', alignItems: 'center' }]}>
-							<Text style={{ color: colors.white }}>Выберите запись для воспроизведения</Text>
+							<Text style={{ color: themeColors.text }}>Выберите запись для воспроизведения</Text>
 						</View>
 					)}
 					{activeVideoName !== null && isVideoLoading && (
 						<View style={styles.loadingOverlay}>
-							<ActivityIndicator size="large" color={colors.lightblue} />
+							<ActivityIndicator size="large" color={themeColors.accent} />
 							<Text style={styles.loadingText}>Инициализация видео...</Text>
 						</View>
 					)}
@@ -253,7 +273,7 @@ export default function VideoScreen() {
 						contentContainerStyle={styles.scrollContent}
 					>
 						{displayedRanges.length === 0 ? (
-							<Text style={{ color: colors.white }}>Записей пока нет...</Text>
+							<Text style={{ color: themeColors.text }}>Записей пока нет...</Text>
 						) : (
 							displayedRanges.map((range) => (
 								<RecordedRangeCard
@@ -282,7 +302,7 @@ export default function VideoScreen() {
 	);
 }
 
-const styles = StyleSheet.create({
+const createStyles = (themeColors: ReturnType<typeof getThemeColors>) => StyleSheet.create({
 	container: {
 		position: "relative",
 		flexDirection: "column",
@@ -290,6 +310,7 @@ const styles = StyleSheet.create({
 		alignItems: "stretch",
 		width: "100%",
 		height: "100%",
+		backgroundColor: themeColors.background,
 	},
 	playerColumn: {
 		width: "100%",
@@ -353,7 +374,7 @@ const styles = StyleSheet.create({
 		alignItems: 'center',
 	},
 	playerTimeText: {
-		color: colors.white,
+		color: themeColors.text,
 		fontSize: 16,
 	},
 	scrollContent: {
@@ -369,9 +390,10 @@ const styles = StyleSheet.create({
 		alignItems: 'center',
 		zIndex: 1000,
 		elevation: 100,
+		backgroundColor: themeColors.surface,
 	},
 	rangeCardsTitle: {
-		color: colors.lightblue,
+		color: themeColors.accent,
 		fontSize: 10,
 		fontWeight: '800',
 		letterSpacing: 1,
@@ -381,9 +403,9 @@ const styles = StyleSheet.create({
 		width: "100%",
 		height: 110,
 		flexDirection: "column",
-		backgroundColor: 'rgba(20, 20, 25, 0.5)',
+		backgroundColor: themeColors.listBackground,
 		borderTopWidth: 1,
-		borderTopColor: 'rgba(255, 255, 255, 0.1)',
+		borderTopColor: themeColors.border,
 		paddingTop: 6,
 		paddingLeft: 12,
 	},
@@ -399,7 +421,7 @@ const styles = StyleSheet.create({
 		bottom: 0,
 		width: "100%",
 		height: "100%",
-		backgroundColor: '#000',
+		backgroundColor: themeColors.fullscreenBackground,
 		zIndex: 999,
 		elevation: 999,
 	},
@@ -416,7 +438,7 @@ const styles = StyleSheet.create({
 		paddingTop: 16,
 		paddingBottom: 12,
 		paddingHorizontal: 10,
-		backgroundColor: 'rgba(0, 0, 0, 0.55)',
+		backgroundColor: themeColors.fullscreenControlsOverlay,
 	},
 	loadingOverlay: {
 		position: "absolute",
@@ -426,11 +448,11 @@ const styles = StyleSheet.create({
 		bottom: 0,
 		justifyContent: "center",
 		alignItems: "center",
-		backgroundColor: 'rgba(0, 0, 0, 0.45)',
+		backgroundColor: themeColors.loadingOverlay,
 		gap: 10,
 	},
 	loadingText: {
-		color: colors.white,
+		color: themeColors.text,
 		fontSize: 14,
 	},
 });

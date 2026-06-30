@@ -30,15 +30,15 @@ const LoginParamsConfig = () => {
 			<View>
 				<View style={styles.inputBlock}>
 					<Text style={[styles.label, {color: theme === "dark" ? colors.white : colors.black}]}>Логин</Text>
-					<Input value={userName} onChangeText={handleLogin} placeholder='Новый логин'/>
+					<Input theme={theme} value={userName} onChangeText={handleLogin} placeholder='Новый логин'/>
 				</View>
 				<View style={styles.inputBlock}>
 					<Text style={[styles.label, {color: theme === "dark" ? colors.white : colors.black}]}>Пароль</Text>
-					<Input value={password} onChangeText={handlePassword} placeholder='Новый пароль'/>
+					<Input theme={theme} value={password} onChangeText={handlePassword} placeholder='Новый пароль'/>
 				</View>
 			</View>
 
-			<CustomButton label='Сохранить логин и пароль' onPress={saveData} />
+			<CustomButton theme={theme} label='Сохранить логин и пароль' onPress={saveData} />
 		</View>
 	)
 }

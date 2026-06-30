@@ -1,6 +1,7 @@
 import React, {FC} from "react";
 import { TextInput, StyleSheet } from "react-native";
 import { colors } from "../../constants/colors";
+import getColorByTheme from "../helpers/getColorByTheme";
 
 type InputPropsType = {
     value: string,
@@ -9,16 +10,17 @@ type InputPropsType = {
     style?: object,
     password?: boolean,
     disabled?: boolean,
-    autoCorrect?:boolean
+    autoCorrect?:boolean,
+    theme?: "dark" | "light"
 }
 
-const Input : FC<InputPropsType> = ({value, onChangeText, placeholder, style, password, disabled, autoCorrect}) => {
+const Input : FC<InputPropsType> = ({value, onChangeText, placeholder, style, password, disabled, autoCorrect, theme = "dark"}) => {
     return (
         <TextInput
             autoCorrect = {autoCorrect}
             secureTextEntry={password}
             value={value}
-            style = {[styles.input, style]}
+            style = {[styles.input, style, theme === "light" ? {backgroundColor: getColorByTheme(theme), color: colors.black} : null]}
             onChangeText={onChangeText}
             editable={!disabled}
             placeholder={placeholder || ""}

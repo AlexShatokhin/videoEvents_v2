@@ -38,8 +38,8 @@ const SettingsAuthorization = () => {
 	return (
 		<Animated.View style={[styles.wrapper, animatedStyle]}>
 			<Text style={[styles.title, {color: theme === "dark" ? colors.white : colors.black}]}>Авторизация</Text>
-			<Input style={{width: 300, marginBottom: 20}} password placeholder='Введите пароль' value={password} onChangeText={setPassword} />
-			<CustomButton buttonStyle={{width: 300}} label="Войти" onPress={handleLogin} />
+			<Input theme={theme} style={{width: 300, marginBottom: 20}} password placeholder='Введите пароль' value={password} onChangeText={setPassword} />
+			<CustomButton theme={theme} buttonStyle={{width: 300}} label="Войти" onPress={handleLogin} />
 			{errorMessage && <Text style={{marginTop: 10}}>{errorMessage}</Text>}
 		</Animated.View>
   )

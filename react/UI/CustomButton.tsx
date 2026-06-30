@@ -7,12 +7,13 @@ type CustomButtonPropsType = {
     onPress: () => void,
     label: string | React.ReactElement,
     textStyle?: object,
-    buttonStyle?: object
+    buttonStyle?: object,
+    theme?: "dark" | "light"
 }
 
-const CustomButton : FC<CustomButtonPropsType> = ({onPress, label, textStyle, buttonStyle}) => {
+const CustomButton : FC<CustomButtonPropsType> = ({onPress, label, textStyle, buttonStyle, theme = "dark"}) => {
     return (
-        <PressableArea style={[styles.button, buttonStyle]} onPress={onPress}>
+        <PressableArea style={[styles.button, buttonStyle, theme === "light" ? {backgroundColor: colors.lightblue} : null]} onPress={onPress}>
             <Text style={[styles.buttonText, textStyle]}>{label}</Text>
         </PressableArea>
     )

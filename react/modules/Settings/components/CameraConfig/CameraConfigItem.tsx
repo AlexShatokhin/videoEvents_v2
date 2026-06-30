@@ -15,6 +15,7 @@ const CameraConfigItem : FC<{cameraName: string, cameraId: string, onChange: (te
                 {cameraName}
             </Text>
             <Input 
+                theme={theme}
                 style={{width: 90, height: 40, textAlign: "center", fontSize: 20, paddingHorizontal: 5}}
                 onChangeText={onChange}
                 value={cameraId}/>

@@ -1,6 +1,6 @@
 import { createSlice, PayloadAction } from "@reduxjs/toolkit";
 //@ts-ignore
-import {APP_USERNAME, PASSWORD, IP, SERVER_IP} from "@env"
+import {APP_USERNAME, PASSWORD, IP, SERVER_IP, CONNECTION_TYPE} from "@env"
 
 
 type initialStateType = {
@@ -8,6 +8,7 @@ type initialStateType = {
     password: string,
     ip: string,
     serverIP: string,
+    connectionType: "wifi" | "4g"
 }
 
 const initialState: initialStateType = {
@@ -15,6 +16,7 @@ const initialState: initialStateType = {
     password: PASSWORD,
     ip: IP,
     serverIP: SERVER_IP,
+    connectionType: CONNECTION_TYPE
 }
 
 const authorizationSlice = createSlice({
@@ -33,10 +35,13 @@ const authorizationSlice = createSlice({
        setServerIP: (state, action : PayloadAction<string>) => {
             state.serverIP = action.payload
        },             
+       setConnectionType: (state, action : PayloadAction<"wifi" | "4g">) => {
+            state.connectionType = action.payload
+       },          
     }
 })
 
 const {actions, reducer} = authorizationSlice;
 
 export default reducer;
-export const {setUsername, setPassword, setIP, setServerIP} = actions;
+export const {setUsername, setPassword, setIP, setServerIP, setConnectionType} = actions;

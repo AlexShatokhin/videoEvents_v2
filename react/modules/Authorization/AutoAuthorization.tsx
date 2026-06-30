@@ -28,7 +28,7 @@ const AutoAuthorization: FC<AutoAuthorizationPropsType> = ({ navigation }) => {
 	const [loadingStatus, setLoadingStatus] = useState<"loading" | "again" | "success" | "error">("loading");
 	const [authorizationMessage, setAuthorizationMessage] = useState<string>("");
 	const backgroundColorValue = useSharedValue(0);
-	const {ip, serverIP, userName, password} = useTypedSelector(state => state.authorizationReducer)
+	const {ip, serverIP, userName, password, connectionType} = useTypedSelector(state => state.authorizationReducer)
 	const dispatch = useTypedDispatch()
 
 const errorTimerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
@@ -96,7 +96,7 @@ const errorTimerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefine
 	}
 
 	const handleReload = () => {
-		if (ip.length === 0 || serverIP.length === 0) {
+		if (connectionType === "wifi") {
 			getLoginDataAndInit();
 		} else {
 			loginHandler(userName, password, ip, serverIP);

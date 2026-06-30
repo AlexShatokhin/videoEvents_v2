@@ -15,7 +15,7 @@ import { useIsFocused, useRoute } from "@react-navigation/native";
 import * as Network from 'expo-network';
 import { RouteProp } from "@react-navigation/native";
 import Label from "../../UI/Label";
-import { setIP, setPassword, setServerIP, setUsername } from "./slice/AuthorizationSlice";
+import { setConnectionType, setIP, setPassword, setServerIP, setUsername } from "./slice/AuthorizationSlice";
 
 type AuthorizationPropsType = NativeStackScreenProps<RootStackParamList, 'AuthorizationPage'>;
 
@@ -24,8 +24,7 @@ const Authorization: FC<AuthorizationPropsType> = ({ navigation }) => {
     const [snackbarMessage, setSnackbarMessage] = useState<string>("Заполните все поля!");
     const [showSnackbar, setShowSnackbar] = useState<boolean>(false);
     const [loadingStatus, setLoadingStatus] = useState<"loading" | "idle" | "success" | "error">("idle");
-    const [connectionMode, setConnectionMode] = useState<"wifi" | "4g">("wifi");
-    const { userName, password, ip, serverIP } = useTypedSelector(state => state.authorizationReducer);
+    const { userName, password, ip, serverIP, connectionType } = useTypedSelector(state => state.authorizationReducer);
     const [inputIp, setInputIp] = useState(ip)
     const [inputServerIp, setInputServerIp] = useState(serverIP)
     const { autoLogin, theme } = useTypedSelector(state => state.settingsReducer)
@@ -51,7 +50,7 @@ const Authorization: FC<AuthorizationPropsType> = ({ navigation }) => {
     }, [route]);
 
     useEffect(() => {
-        if (connectionMode === "wifi") {
+        if (connectionType === "wifi") {
             const detectNetwork = async () => {
                 const deviceIp = await Network.getIpAddressAsync();
                 const gatewayIp = deviceIp.split('.').slice(0, 3).join('.') + '.1';
@@ -62,7 +61,7 @@ const Authorization: FC<AuthorizationPropsType> = ({ navigation }) => {
             };
             detectNetwork();
         }
-    }, [connectionMode]);
+    }, [connectionType]);
 
     useEffect(() => {
         if (isFocused) {
@@ -130,13 +129,13 @@ const Authorization: FC<AuthorizationPropsType> = ({ navigation }) => {
                     text="Wi-Fi"
                     style={[
                         styles.connectionLabel,
-                        connectionMode === "wifi" ? styles.connectionLabelActive : styles.connectionLabelInactive,
-                        theme === "light" ? { color: connectionMode === "wifi" ? colors.black : colors.lightgrey } : {},
+                        connectionType === "wifi" ? styles.connectionLabelActive : styles.connectionLabelInactive,
+                        theme === "light" ? { color: connectionType === "wifi" ? colors.black : colors.lightgrey } : {},
                     ]}
                 />
                 <Switch
-                    value={connectionMode === "4g"}
-                    onValueChange={(val: boolean) => setConnectionMode(val ? "4g" : "wifi")}
+                    value={connectionType === "4g"}
+                    onValueChange={(val: boolean) => { dispatch(setConnectionType(val ? "4g" : "wifi"))}}
                     trackColor={{ false: colors.lightgrey, true: colors.deepblue }}
                     thumbColor={colors.lightblue}
                 />
@@ -144,8 +143,8 @@ const Authorization: FC<AuthorizationPropsType> = ({ navigation }) => {
                     text="4G"
                     style={[
                         styles.connectionLabel,
-                        connectionMode === "4g" ? styles.connectionLabelActive : styles.connectionLabelInactive,
-                        theme === "light" ? { color: connectionMode === "4g" ? colors.black : colors.lightgrey } : {},
+                        connectionType === "4g" ? styles.connectionLabelActive : styles.connectionLabelInactive,
+                        theme === "light" ? { color: connectionType === "4g" ? colors.black : colors.lightgrey } : {},
                     ]}
                 />
             </Stack>
@@ -165,7 +164,7 @@ const Authorization: FC<AuthorizationPropsType> = ({ navigation }) => {
                         id="password" 
                         label="Пароль" />
 
-                    {connectionMode === "4g" && (
+                    {connectionType === "4g" && (
                         <>
                             <AuthorizationInput 
                                 value={inputIp}

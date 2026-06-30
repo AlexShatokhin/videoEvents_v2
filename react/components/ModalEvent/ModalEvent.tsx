@@ -129,7 +129,7 @@ const ModalEvent : FC<ModalEventPropsType> = ({selectedEventItem, toggleItemsDis
                 onPress = {() => onPressImageHandler(index)}
                 key = {index} 
                 image={item}
-                imageStyle = {{width: 150, height: 150}}/>
+                imageStyle = {{width: 300, height: 300}}/>
         })
     }
 
@@ -177,7 +177,7 @@ const ModalEvent : FC<ModalEventPropsType> = ({selectedEventItem, toggleItemsDis
         <>
             <ModalEventWrapper>
                     <Stack direction="column">
-                        <View style={{height: "60%", position: "relative"}}>
+                        <View style={{height: "70%", position: "relative"}}>
                             <ScrollView contentContainerStyle={{paddingBottom: 80}} style={{flex: 1}}>
                                 {
                                     imageLoadingStatus === "loading" ? 
